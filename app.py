@@ -12,7 +12,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import base64
 
-app = dash.Dash(__name__, external_stylesheets = [dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets = [dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 
 # retrieves the image as a base64 encoded string
 with open('./assets/cheetah-1.jpg', 'rb') as image_file:
@@ -22,7 +22,12 @@ with open('./assets/cheetah-1.jpg', 'rb') as image_file:
 with open('./assets/cheetah-2.jpg', 'rb') as image_file:
     cheetah_2 = base64.b64encode(image_file.read()).decode('ascii')
 
-app.layout = dbc.Container(
+app.layout = html.Div([
+    dcc.Location(id='url', refresh=False),
+    html.Div(id='page-content')
+])
+
+index_page = dbc.Container(
     [
         html.Div(
             [
@@ -30,8 +35,12 @@ app.layout = dbc.Container(
                     [
                         dbc.Col(
                             [
-                                html.Div(html.Img(id='cheetah-img', src='data:image/png;base64,{}'.format(cheetah_1), alt='cheetah')),    
-                                html.Div(html.Button(id='change-cheetah', n_clicks=0, children='Change Cheetah Image!'))
+                                html.Div([
+                                    html.A([
+                                        html.Img(id='cheetah-img', src='data:image/png;base64,{}'.format(cheetah_1), alt='cheetah')
+                                    ], href='/cheetah'),    
+                                    html.Div(html.Button(id='change-cheetah', n_clicks=0, children='Change Cheetah Image!'))
+                                ])
                             ], width=4),
                         dbc.Col(html.Div(html.Img(src=app.get_asset_url('condor-1.jpg'), alt='condor')), width=4),
                         dbc.Col(html.Div(html.Img(src=app.get_asset_url('elephant-1.jpg'), alt='elephant')), width=4)
@@ -63,11 +72,33 @@ app.layout = dbc.Container(
     ]
 )
 
+cheetah_page_layout = dbc.Container(
+    html.Div([
+        html.H1('Cheetah Images'),
+        dbc.Row(
+            [
+                dbc.Col(html.Div(html.Img(id='cheetah-img', src='data:image/png;base64,{}'.format(cheetah_1), alt='cheetah', n_clicks=0)), width=6),
+                dbc.Col(html.Div(html.Img(id='cheetah-img', src='data:image/png;base64,{}'.format(cheetah_2), alt='cheetah', n_clicks=0)), width=6),
+            ]
+        ),
+        dcc.Link('Go back', href='/')
+    ])
+)
+
 # change cheetah image callback
 @app.callback(Output('cheetah-img', 'src'),
               Input('change-cheetah', 'n_clicks'), prevent_initial_call = True)
 def change_cheetah(n_clicks):
     return('data:image/png;base64,{}'.format(cheetah_2))
+
+# Update the index
+@app.callback(Output('page-content', 'children'),
+              [Input('url', 'pathname')])
+def display_page(pathname):
+    if pathname == '/cheetah':
+        return cheetah_page_layout
+    else:
+        return index_page
 
 if __name__ == '__main__':
     app.run_server(debug=True)
