@@ -120,6 +120,8 @@ Example that breaks when simulating a monolithic approach (have dash run on the 
 
 For some reason, running the dash server causes another thread to start the server, which ends up creating an OS error since the port address is already in use. The fact that it circumvents my lock is alarming since this was my only workaround to this problem.
 
+Interestingly, running this main with `th1.start()` commented out does not result in the dash server creating a second main, which leads me to believe the problem results from a combination of running other threads and running dash.
+
 Difference from working example:
   - th2 (Thread-2) is no longer being created
   - instead, I start the dash server with `app.run_server(debug=True)`
