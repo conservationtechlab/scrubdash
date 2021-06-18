@@ -18,7 +18,7 @@ The problem described in previous commits and versions of this program have been
 
 A callback is executed every two seconds to update the interval counter on the page. This shows that dash is still running and updating, even when another thread is running an asyncio server.
 
-Running the command `nc localhost 8888` and typing in a message in another terminal will send a message to the asyncio server and you should see the message printed out in the terminal running server_example.py. This shows that this program is able to run both the asyncio and the dash server concurrently.
+Running the command `nc localhost 8888` and typing in a message in another terminal will send a message to the asyncio server and you should see the message printed out in the terminal running server_example.py. You can also run client.py instead of `nc localhost 8888` to test this program. This shows that this program is able to run both the asyncio and the dash server concurrently.
 """
 
 # *** Server Code (can ignore) ***
