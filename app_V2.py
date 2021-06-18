@@ -7,8 +7,20 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import asyncio
 import base64
-
 from multiprocessing import Process, Queue
+
+"""
+This program consists of 3 processes:
+    1. main
+    2. asyncio server
+    3. dash server
+
+The main process creates a shared Queue and uses multiprocessing to spawn an asyncio processes and a dash processes. The shared Queue is passed as a parameter to each process. 
+
+The asyncio server listens on port 8888 on localhost and puts any messages it receives into the shared Queue. Every 2 seconds, the dash server will check the Queue to see if anything was added to it. If so, it gets each element and adds it to the website. The website ends up rendering all the text that was received by the asyncio server.
+
+app_V2.py is best used with client.py from 6-18-2021. One can also send messages to the asyncio terminal by executing `nc localhost 8888` in another terminal and typing in a message.
+"""
 
 
 def start_asyncio(queue):
