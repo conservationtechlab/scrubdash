@@ -3,7 +3,8 @@
 import asyncio
 
 """
-referenced from: https://github.com/CS131-TA-team/UCLA_CS131_CodeHelp/blob/master/Python/echo_client.py
+referenced from:
+https://github.com/CS131-TA-team/UCLA_CS131_CodeHelp/blob/master/Python/echo_client.py
 
 To run with server_example.py:
 1. start server_example.py first in a terminal
@@ -20,8 +21,14 @@ To run with app_V2.py:
 You should see messages appear on the website page on localhost:8050
 """
 
+
 class Client:
-    def __init__(self, ip='127.0.0.1', port=8888, name='client', message_max_length=1e6):
+    def __init__(
+            self,
+            ip='127.0.0.1',
+            port=8888,
+            name='client',
+            message_max_length=1e6):
         """
         127.0.0.1 is the localhost
         port could be any port
@@ -40,9 +47,9 @@ class Client:
         writer.write(message.encode())
 
         print('close the socket')
-        # The following lines closes the stream properly
-        # If there is any warning, it's due to a bug o Python 3.8: https://bugs.python.org/issue38529
-        # Please ignore it
+        # The following lines closes the stream properly If there is any
+        # warning, it's due to a bug o Python 3.8:
+        # https://bugs.python.org/issue38529 Please ignore it
         writer.close()
 
     def run_until_quit(self):
@@ -50,7 +57,14 @@ class Client:
         while True:
             # collect the message to send
             message = input("Please input the next message to send: ")
-            if message in ['quit', 'exit', ':q', 'exit;', 'quit;', 'exit()', '(exit)']:
+            if message in [
+                'quit',
+                'exit',
+                ':q',
+                'exit;',
+                'quit;',
+                'exit()',
+                    '(exit)']:
                 break
             else:
                 asyncio.run(self.tcp_echo_client(message))
