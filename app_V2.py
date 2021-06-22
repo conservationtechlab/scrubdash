@@ -106,6 +106,7 @@ def start_dash(queue):
     import dash_html_components as html
     from dash.dependencies import Input, Output, State
     import base64
+    import pandas as pd
 
     app = dash.Dash(
         __name__,
@@ -131,6 +132,7 @@ def start_dash(queue):
     # will end up needing to include a parameter that lists all the animals the
     # scrubcam is tracking
     def create_image_dict():
+        # create uninitialized dictionary
         image_dict = {
             'cheetah': None,
             'condor': None,
@@ -144,6 +146,21 @@ def start_dash(queue):
             'polar-bear': None,
             'rhino': None,
             'tortoise': None}
+
+        # initialize image path to most recent entry in image_log.csv
+        df = pd.read_csv('image_log.csv')
+
+        for key in image_dict:
+            # resets the indices after dropping rows
+            filtered = df[df['label'] == key].reset_index(drop=True)
+            # sorts paths in descending order (most recent to least recent)
+            filtered.sort_values(ascending=False, by=['path'], inplace=True)
+
+            # at least one image exists for this animal
+            if len(filtered.index) > 0:
+                # get most recent image (the first row since sorted by desc
+                # order)
+                image_dict[key] = filtered.iloc[0].values[0]
 
         return image_dict
 
