@@ -52,7 +52,7 @@ def start_asyncio(queue):
         with open('image_log.csv', 'a') as image_csv:
             image_csv.write('{},{}\n'.format(filepath, class_name))
 
-        return filename
+        return filepath
 
     # reads in two messages from client and prints out the messages received
 
@@ -105,31 +105,105 @@ def start_dash(queue):
     import dash_bootstrap_components as dbc
     import dash_html_components as html
     from dash.dependencies import Input, Output, State
+    import base64
 
     app = dash.Dash(
         __name__,
         external_stylesheets=[
             dbc.themes.BOOTSTRAP],
         suppress_callback_exceptions=True)
-    app.layout = html.Div([
-        html.Div("", id='content'),
-        dcc.Interval(
-            id='interval-component',
-            interval=1.5 * 1000,  # in milliseconds
-            n_intervals=0
-        )
-    ])
 
-    # updates content displayed on page
-    @app.callback(Output('content', 'children'),
-                  [Input('interval-component', 'n_intervals')],
-                  [State('content', 'children')], prevent_initial_call=True)
-    def empty_queue(n_intervals, content):
-        # prints everything in the Queue
+    app.layout = dbc.Container(
+        [
+            html.Div(
+                id='grid-content'
+            ),
+            dcc.Store(id='image-dict'),
+            dcc.Interval(
+                id='interval-component',
+                interval=1.5 * 1000,  # in milliseconds
+                n_intervals=0
+            )
+        ]
+    )
+
+    # function to update image dictionary
+    # will end up needing to include a parameter that lists all the animals the
+    # scrubcam is tracking
+    def create_image_dict():
+        image_dict = {
+            'cheetah': None,
+            'condor': None,
+            'elephant': None,
+            'flamingo': None,
+            'hippo': None,
+            'koala': None,
+            'lion': None,
+            'panda': None,
+            'penguin': None,
+            'polar-bear': None,
+            'rhino': None,
+            'tortoise': None}
+
+        return image_dict
+
+    # checks shared queue every 2 seconds to update image dictionary
+    @app.callback(Output('image-dict', 'data'),
+                  Input('interval-component', 'n_intervals'),
+                  State('content', 'children'),
+                  State('image-dict', 'data'), prevent_initial_call=True)
+    def update_image_dict(n_intervals, content, image_dict):
+        if image_dict is None:
+            image_dict = create_image_dict()
+
         while not queue.empty():
-            content += ", {}".format(queue.get(block=False))
-        print("content: {}".format(content))
-        return(content)
+            image = queue.get(block=False)
+            filename = image['img_path']
+            class_name = image['label']
+            image_dict[class_name] = filename
+
+        return image_dict
+
+    # returns base64 encoding of image
+    def get_base64_image(filename):
+        base64_image = None
+        if filename is None:
+            return ""
+
+        with open(filename, 'rb') as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('ascii')
+
+        return base64_image
+
+    # updates grid images when image dictionary changes
+    @app.callback(Output('grid-content', 'children'),
+                  Input('image-dict', 'data'))
+    def update_grid(image_dict):
+        grid = []
+        row = []
+        col = 0
+
+        # put 3 columns in a row
+        # put 1 image per column
+        for class_name, filename in image_dict.items():
+            base64_image = get_base64_image(filename)
+            row.append(
+                dbc.Col(
+                    html.Div(
+                        html.Img(
+                            id=class_name,
+                            src='data:image/png;base64,{}'.format(base64_image)))))
+            col += 1
+
+            if col == 3:
+                col = 0
+                # need to copy since I'm reusing the row variable and python
+                # stores values in a dict as a pointer. To avoid overwriting
+                # data, I make a copy.
+                grid.append(dbc.Row(row.copy()))
+                row = []
+
+        return grid
 
     app.run_server()
 
