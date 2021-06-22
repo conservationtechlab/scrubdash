@@ -150,9 +150,8 @@ def start_dash(queue):
     # checks shared queue every 2 seconds to update image dictionary
     @app.callback(Output('image-dict', 'data'),
                   Input('interval-component', 'n_intervals'),
-                  State('content', 'children'),
                   State('image-dict', 'data'), prevent_initial_call=True)
-    def update_image_dict(n_intervals, content, image_dict):
+    def update_image_dict(n_intervals, image_dict):
         if image_dict is None:
             image_dict = create_image_dict()
 
