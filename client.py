@@ -15,11 +15,11 @@ To run with app_V2.py:
 2. start client.py in another terminal
 3. press 'enter' to send a message to the dash server or 'quit' to quit
 
-You should see messages containing the image path and the class name appear on
-the website page on localhost:8050
+You should see messages containing the image path and the class name
+appear on the website page on localhost:8050
 
-This client cycles through images in a csv and sends the image bystream, along
-with metadata, to the asyncio server.
+This client cycles through images in a csv and sends the image
+bystream, along with metadata, to the asyncio server.
 """
 
 
@@ -68,6 +68,13 @@ class Client:
         # opening socket
         reader, writer = await asyncio.open_connection(self.ip, self.port)
 
+        # creating header
+        header = "IMAGE"
+        header_bytes = header.encode()
+
+        writer.write(struct.pack('<L', len(header_bytes)))
+        writer.write(header_bytes)
+
         # obtaining the image bytes
         with open(self.image_path, 'rb') as image_file:
             self.image_bytes = image_file.read()
@@ -93,8 +100,8 @@ class Client:
         await writer.drain()
 
         print('closing the socket')
-        # The following lines closes the stream properly If there is any
-        # warning, it's due to a bug o Python 3.8:
+        # The following lines closes the stream properly If there is
+        # any warning, it's due to a bug o Python 3.8:
         # https://bugs.python.org/issue38529 Please ignore it
         writer.close()
         await writer.wait_closed()
@@ -103,7 +110,45 @@ class Client:
         print('updating image')
         self.update_img()
 
+    async def send_image_classes(self):
+        classes = ['cheetah',
+                   'condor',
+                   'elephant',
+                   'flamingo',
+                   'hippo',
+                   'koala',
+                   'lion',
+                   'panda',
+                   'penguin',
+                   'polar-bear',
+                   'rhino',
+                   'tortoise']
+
+        # convert classes list into a bytestream
+        classes_bytes = pickle.dumps(classes)
+
+        reader, writer = await asyncio.open_connection(self.ip, self.port)
+
+        header = "CLASSES"
+        header_bytes = header.encode()
+
+        writer.write(struct.pack('<L', len(header_bytes)))
+        writer.write(header_bytes)
+
+        writer.write(struct.pack('<L', len(classes_bytes)))
+        await writer.drain()
+        writer.write(classes_bytes)
+        await writer.drain()
+
+        writer.close()
+        await writer.wait_closed()
+
+        print("classes sent")
+
     def run_until_quit(self):
+        # send over image classes on startup
+        asyncio.run(self.send_image_classes())
+
         # start the loop
         while True:
             # collect the message to send
