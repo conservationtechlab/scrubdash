@@ -19,14 +19,17 @@ asyncio processes and a dash processes. The shared Queue is passed as a
 parameter to each process.
 
 The asyncio server listens on port 8888 on localhost and puts any messages it
-receives into the shared Queue. Every 2 seconds, the dash server will check the
-Queue to see if anything was added to it. If so, it gets each element and adds
-it to the website. The website ends up rendering all the text that was received
-by the asyncio server.
+receives into the shared Queue. Every 1.5 seconds, the dash server checks the
+Queue to see if anything was added to it. If so, it removes each entry from the
+Queue and adds the image stored inside to the website. The website ends up
+rendering the most recent image for each animal class.
 
-app_V2.py is best used with client.py from 6-18-2021. One can also send
-messages to the asyncio terminal by executing `nc localhost 8888` in another
-terminal and typing in a message.
+Additionally, clicking on an image will take you to a new page that shows all
+the photos taken for that animal. The images are shown in rows of 3, from most
+recent to least recent.
+
+app_V2.py is best used with client.py from 6-21-2021. Pressing 'enter' will
+send a new image to the asyncio server, which will be rendered by dash.
 """
 
 
@@ -114,17 +117,27 @@ def start_dash(queue):
             dbc.themes.BOOTSTRAP],
         suppress_callback_exceptions=True)
 
-    app.layout = dbc.Container(
+    app.layout = html.Div(
+        [
+            dcc.Location(id='url', refresh=False),
+            html.Div(id='page-content')
+        ]
+    )
+
+    index_page = dbc.Container(
         [
             html.Div(
-                id='grid-content'
-            ),
-            dcc.Store(id='image-dict'),
-            dcc.Interval(
-                id='interval-component',
-                interval=1.5 * 1000,  # in milliseconds
-                n_intervals=0
-            )
+                [
+                    html.Div(
+                        id='grid-content'),
+                    dcc.Store(id='image-dict'),
+                    dcc.Interval(
+                        id='interval-component',
+                        interval=1.5 * 1000,  # in milliseconds
+                        n_intervals=0
+                    )
+                ],
+                id='page-content')
         ]
     )
 
@@ -167,7 +180,7 @@ def start_dash(queue):
     # checks shared queue every 2 seconds to update image dictionary
     @app.callback(Output('image-dict', 'data'),
                   Input('interval-component', 'n_intervals'),
-                  State('image-dict', 'data'), prevent_initial_call=True)
+                  State('image-dict', 'data'))
     def update_image_dict(n_intervals, image_dict):
         if image_dict is None:
             image_dict = create_image_dict()
@@ -206,8 +219,57 @@ def start_dash(queue):
             row.append(
                 dbc.Col(
                     html.Div(
+                        html.A(
+                            html.Img(
+                                id=class_name,
+                                src='data:image/png;base64,{}'.format(base64_image)),
+                            href='/{}'.format(class_name)))))
+            col += 1
+
+            if col == 3:
+                col = 0
+                # need to copy since I'm reusing the row variable and python
+                # stores values in a dict as a pointer. To avoid overwriting
+                # data, I make a copy.
+                grid.append(dbc.Row(row.copy()))
+                row = []
+
+        # if we didn't have a multiple of 3 images, the last row never got
+        # appended to grid
+        if col != 0:
+            grid.append(dbc.Row(row.copy()))
+
+        return grid
+
+    # creates grid of all images for the animal
+    def create_history_page(pathname):
+        # removes the '/' from the beginning of pathname
+        animal = pathname[1:]
+        h1_header = '{} Images'.format(animal.capitalize())
+
+        # creating the history grid
+        df = pd.read_csv('image_log.csv')
+
+        # resets the indices after dropping rows
+        filtered = df[df['label'] == animal].reset_index(drop=True)
+        # sorts paths in descending order (most recent to least recent)
+        filtered.sort_values(ascending=False, by=['path'], inplace=True)
+        # gets a list of animal images
+        image_list = filtered['path'].to_list()
+
+        grid = []
+        row = []
+        col = 0
+
+        # put 3 columns in a row
+        # put 1 image per column
+        for image in image_list:
+            base64_image = get_base64_image(image)
+            row.append(
+                dbc.Col(
+                    html.Div(
                         html.Img(
-                            id=class_name,
+                            id=animal,
                             src='data:image/png;base64,{}'.format(base64_image)))))
             col += 1
 
@@ -219,7 +281,33 @@ def start_dash(queue):
                 grid.append(dbc.Row(row.copy()))
                 row = []
 
-        return grid
+        # if we didn't have a multiple of 3 images, the last row never got
+        # appended to grid
+        if col != 0:
+            grid.append(dbc.Row(row.copy()))
+
+        history_page_layout = dbc.Container(
+            html.Div(
+                [
+                    html.H1(h1_header),
+                    html.Div(grid),
+                    dcc.Link(
+                        'Go back',
+                        href='/')
+                ]
+            )
+        )
+
+        return history_page_layout
+
+    # Update the index
+    @app.callback(Output('page-content', 'children'),
+                  [Input('url', 'pathname')])
+    def display_page(pathname):
+        if pathname == '/':
+            return index_page
+        else:
+            return create_history_page(pathname)
 
     app.run_server()
 
