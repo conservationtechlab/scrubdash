@@ -254,6 +254,8 @@ def start_dash(queue):
 
         # put 3 columns in a row
         # put 1 image per column
+        # image base64 refernce: https://stackoverflow.com/questions/
+        # 3715493/encoding-an-image-file-with-base64
         for class_name, filename in image_dict.items():
             base64_image = get_base64_image(filename)
             row.append(
