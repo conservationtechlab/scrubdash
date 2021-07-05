@@ -5,6 +5,9 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import base64
 import pandas as pd
+import logging
+
+log = logging.getLogger(__name__)
 
 
 def start_dash(queue):
@@ -210,7 +213,7 @@ def start_dash(queue):
 
         return history_page_layout
 
-    # Update the index
+    # Update the page
     @app.callback(Output('page-content', 'children'),
                   Input('url', 'pathname'))
     def display_page(pathname):
@@ -220,3 +223,8 @@ def start_dash(queue):
             return create_history_page(pathname)
 
     app.run_server()
+
+    # don't need to catch KeyboardInterrupt since app.run_server() catches the
+    # keyboard interrupt to end the server.
+    # getting to log.info() means that the server has successfully closed.
+    log.info('Successfully shut down dash server.')

@@ -3,6 +3,9 @@ import asyncio
 import struct
 import pickle
 from datetime import datetime
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class asyncio_server:
@@ -105,10 +108,15 @@ class asyncio_server:
                                             8888)
 
         async with server:
-            # the server will listen forever until we close it
+            # the server will listen forever until we cancel recv_message()
+            # cancelling recv_message() automatically closes the server ref:
+            # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.Server.serve_forever
             await server.serve_forever()
 
-        server.close()
-
     def start_server(self):
-        asyncio.run(self.run_forever())
+        try:
+            asyncio.run(self.run_forever())
+        except KeyboardInterrupt:
+            # I think asyncio.run() gracefully cleans up all resources on
+            # KeyboardInterrupt...not 100% sure though
+            log.info('Successfully shut down asyncio server.')
