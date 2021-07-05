@@ -12,8 +12,8 @@ class asyncio_server:
     def __init__(
             self,
             queue,
-            ip='127.0.0.1',
-            port=8888,
+            ip,
+            port,
             record_folder='saved_images/'):
         self.queue = queue
         self.ip = ip
@@ -104,8 +104,8 @@ class asyncio_server:
     # incoming messages
     # all incoming messages are handled by handle_echo(reader, writer)
     async def run_forever(self):
-        server = await asyncio.start_server(self.handle_echo, '127.0.0.1',
-                                            8888)
+        server = await asyncio.start_server(self.handle_echo, self.ip,
+                                            self.port)
 
         async with server:
             # the server will listen forever until we cancel recv_message()
