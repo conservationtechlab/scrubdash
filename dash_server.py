@@ -5,6 +5,8 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import base64
 import pandas as pd
+import plotly.express as px
+from datetime import datetime, timedelta
 import logging
 
 log = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ def start_dash(queue):
     app.layout = html.Div(
         [
             dcc.Location(id='url', refresh=False),
+            dcc.Store(id='image-dict', data={}, storage_type='local'),
             html.Div(id='page-content')
         ]
     )
@@ -30,9 +33,11 @@ def start_dash(queue):
             html.Div(
                 [
                     html.Div(
+                        html.A("Graphs", href='/graphs')
+                    ),
+                    html.Div(
                         "Waiting to connect to scrubcam...",
                         id='grid-content'),
-                    dcc.Store(id='image-dict', data={}, storage_type='local'),
                     dcc.Interval(
                         id='interval-component',
                         interval=1.5 * 1000,  # in milliseconds
@@ -213,12 +218,188 @@ def start_dash(queue):
 
         return history_page_layout
 
+    # creates page to see visualizations of captured images
+    def create_graph_page():
+        df = pd.read_csv('image_log.csv')
+        hist_fig = px.histogram(df, x="label")
+        dropdown_options = [{'label': 'All', 'value': 'All'}]
+        # adds dropdown option for every animal class
+        dropdown_options += [
+                                {
+                                    'label': animal.capitalize(),
+                                    'value': animal
+                                }
+                                for animal in df.label.unique()
+                            ]
+
+        time_span = [
+            {'label': '1 Hour', 'value': 'hour'},
+            {'label': '1 Day', 'value': 'day'},
+            {'label': '1 Week', 'value': 'week'},
+            {'label': '1 Month', 'value': 'month'},
+            {'label': '1 Year', 'value': 'year'},
+        ]
+
+        time_intervals = [
+            {'label': '30 Minutes', 'value': '30M'},
+            {'label': '1 Hour', 'value': '1H'},
+            {'label': '6 Hours', 'value': '6H'},
+            {'label': '12 Hours', 'value': '12H'},
+            {'label': '24 Hours', 'value': '24H'},
+            {'label': '1 Week', 'value': '1W'},
+            {'label': '1 Month', 'value': '1M'},
+            {'label': '3 Months', 'value': '3M'},
+            {'label': '6 Months', 'value': '6M'},
+            {'label': '1 Year', 'value': '1Y'},
+        ]
+
+        day_in_ms = 1000 * 60 * 60 * 24
+        now = datetime.now()
+        start_time = now - timedelta(days=7)
+        start_time_formatted = start_time.strftime('%Y-%m-%d')
+
+        time_fig = px.histogram(df,
+                                x="datetime",
+                                histfunc="count",
+                                title="Histogram on Date Axes")
+        time_fig.update_traces(xbins_start=start_time_formatted,
+                               xbins_size=day_in_ms)
+        time_fig.update_xaxes(dtick=day_in_ms)
+
+        graph_page_layout = html.Div([
+            dbc.Container([
+                html.H1('Aggregate Counts by Class'),
+                dcc.Dropdown(
+                    id='dropdown',
+                    options=dropdown_options,
+                    value='All'),
+                dcc.Graph(id='histogram', figure=hist_fig)
+            ]),
+            dbc.Container([
+                # specify string constant as number of pieces
+                # necessary to make the string be under 80 col
+                # ref:
+                # https://stackoverflow.com/questions/1874592/how-to-write-very-long-string-that-conforms-with-pep8-and-prevent-e501
+                html.H1(('Looking at Images by Class, Time Span, and Time '
+                          'Interval')),
+                html.Div([
+                    html.P('Class:'),
+                    dcc.Dropdown(
+                        id='time-class',
+                        options=dropdown_options,
+                        value='All'
+                    )
+                ]),
+                html.Div([
+                    html.P('Time Span to Graph:'),
+                    dcc.Dropdown(
+                        id='time-span',
+                        options=time_span,
+                        value='week'
+                    ),
+                ]),
+                html.Div([
+                    html.P('Time Interval:'),
+                    dcc.Dropdown(
+                        id='time-interval',
+                        options=time_intervals,
+                        value='24H'
+                    ),
+                ]),
+                dcc.Graph(id='time', figure=time_fig)
+            ])
+        ])
+
+        return graph_page_layout
+
+    # update histogram
+    @app.callback(Output('histogram', 'figure'),
+                  Input('dropdown', 'value'))
+    def update_histogram(selected_value):
+        df = pd.read_csv('image_log.csv')
+        fig = None
+
+        if selected_value == 'All':
+            fig = px.histogram(df, x="label")
+        else:
+            filtered_df = df[df['label'] == selected_value]
+            fig = px.histogram(filtered_df, x="label")
+
+        return fig
+
+    # helper function for update_time_graph
+    # updates the class displayed
+    def update_time_graph_class(fig, selected_class):
+        df = pd.read_csv('image_log.csv')
+
+        if selected_class == 'All':
+            fig = px.histogram(df,
+                               x="datetime",
+                               histfunc="count",
+                               title="Histogral for {} Class(es)"
+                               .format(selected_class.capitalize()))
+        else:
+            filtered_df = df[df['label'] == selected_class]
+            fig = px.histogram(filtered_df, x="datetime")
+
+        fig.update_layout(bargap=0.2)
+        return fig
+
+    def update_time_graph_x_axes(fig, selected_span, selected_interval):
+        span_options = {
+            'hour': timedelta(hours=1),
+            'day': timedelta(days=1),
+            'week': timedelta(days=7),
+            'month': timedelta(days=31),
+            'year': timedelta(days=365),
+        }
+
+        interval_options = {
+            '30M': 1000*60*30,
+            '1H': 1000*60*60,
+            '6H': 1000*60*60*6,
+            '12H': 1000*60*60*12,
+            '24H': 1000*60*60*24,
+            '1W': 1000*60*60*24*7,
+            '1M': 'M1',
+            '3M': 'M3',
+            '6M': 'M6',
+            '1Y': 'M12'
+        }
+
+        now = datetime.now()
+
+        start_time = now-span_options[selected_span]
+        start_time_formatted = start_time.strftime('%Y-%m-%d')
+
+        time_interval = interval_options[selected_interval]
+
+        fig.update_traces(xbins_start=start_time_formatted,
+                          xbins_size=time_interval)
+        fig.update_xaxes(dtick=time_interval)
+
+        return fig
+
+    # update time series graph
+    @app.callback(Output('time', 'figure'),
+                  Input('time-class', 'value'),
+                  Input('time-span', 'value'),
+                  Input('time-interval', 'value'))
+    def update_time_graph(selected_class, selected_span, selected_interval):
+        fig = None
+        fig = update_time_graph_class(fig, selected_class)
+        fig = update_time_graph_x_axes(fig, selected_span, selected_interval)
+
+        return fig
+
     # Update the page
     @app.callback(Output('page-content', 'children'),
                   Input('url', 'pathname'))
     def display_page(pathname):
         if pathname == '/':
             return index_page
+        elif pathname == '/graphs':
+            return create_graph_page()
         else:
             return create_history_page(pathname)
 
