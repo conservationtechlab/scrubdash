@@ -4,6 +4,7 @@ import struct
 import pickle
 from datetime import datetime
 import logging
+import csv
 
 log = logging.getLogger(__name__)
 
@@ -14,37 +15,61 @@ class asyncio_server:
             queue,
             ip,
             port,
-            record_folder='saved_images/'):
+            record_images_folder='saved_images/',
+            record_lboxes_folder='saved_lboxes/'):
         self.queue = queue
         self.ip = ip
         self.port = port
-        self.RECORD_FOLDER = record_folder
+        self.RECORD_IMAGES_FOLDER = record_images_folder
+        self.RECORD_LBOXES_FOLDER = record_lboxes_folder
 
-    def save_image_to_disk(self, image, class_name):
+    def _write_boxes_file(self, timestamp, lboxes):
+        filename = '{}.csv'.format(timestamp)
+        full_filename = os.path.join(self.RECORD_LBOXES_FOLDER, filename)
+        with open(full_filename, 'w') as f:
+            self.csv_writer = csv.writer(f,
+                                         delimiter=',',
+                                         quotechar='"',
+                                         quoting=csv.QUOTE_MINIMAL)
+            for lbox in lboxes:
+                self.csv_writer.writerow([lbox['class_name'],
+                                          lbox['confidence'],
+                                          *lbox['box']])
+                log.info('Loggged {}'.format(lbox['class_name']))
+
+        return full_filename
+
+    def save_image_and_lboxes(self, image, class_name, lboxes):
         now = datetime.now()
+        unix_timestamp = now.timestamp()
+        dt_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
-        filename = '{}_{}.jpeg'.format(timestamp, class_name)
-        filepath = os.path.join(self.RECORD_FOLDER, filename)
+        image_filename = '{}_{}.jpeg'.format(timestamp, class_name)
+        image_path = os.path.join(self.RECORD_IMAGES_FOLDER, image_filename)
 
         # saving image to disk
-        with open(filepath, 'wb') as saved_img:
+        with open(image_path, 'wb') as saved_img:
             saved_img.write(image)
 
-        # update csv log that stores all image records
-        with open('image_log.csv', 'a') as image_csv:
-            image_csv.write('{},{}\n'.format(filepath, class_name))
+        # saving lboxes to csv
+        lboxes_path = self._write_boxes_file(timestamp, lboxes)
 
-        return filepath
+        # update csv log that stores all image records
+        # will want to change this to csv_writer to match _write_boxes_file()
+        with open('image_log.csv', 'a') as image_csv:
+            image_csv.write(
+                '{},{},{},{},{}\n'.format(
+                    image_path,
+                    class_name,
+                    lboxes_path,
+                    unix_timestamp,
+                    dt_timestamp))
+
+        return image_path
 
     # handles image socket messages
     async def handle_image(self, reader, writer):
-        # read size of image bytestream
-        image_struct = await reader.read(struct.calcsize('<L'))
-        image_size = struct.unpack('<L', image_struct)[0]
-        # for debugging: print(image_size)
-
-        # read in image bytestream
-        image = await reader.readexactly(image_size)
+        log.info("handling image")
 
         # read size of lboxes struct
         lboxes_struct = await reader.read(struct.calcsize('<L'))
@@ -53,12 +78,20 @@ class asyncio_server:
         # read in lboxes bytestream
         lboxes_bytes = await reader.readexactly(lboxes_size)
         lboxes = pickle.loads(lboxes_bytes)
-        # for debugging: print(lboxes)
+        log.debug('lboxes received: {}'.format(lboxes))
         # ex: [{'class_name': 'cheetah'}]
         class_name = lboxes[0]['class_name']
 
+        # read size of image bytestream
+        image_struct = await reader.read(struct.calcsize('<L'))
+        image_size = struct.unpack('<L', image_struct)[0]
+        # for debugging: print(image_size)
+
+        # read in image bytestream
+        image = await reader.readexactly(image_size)
+
         # save image to disk and to the csv
-        filename = self.save_image_to_disk(image, class_name)
+        filename = self.save_image_and_lboxes(image, class_name, lboxes)
 
         # send image path and class name to dash server
         message = {
@@ -84,19 +117,32 @@ class asyncio_server:
 
     # reads in messages from client and delegates reading messages
     # based on header received
-    async def handle_echo(self, reader, writer):
+    async def handle_header(self, reader, writer):
         # read size of header bytestream
         header_struct = await reader.read(struct.calcsize('<L'))
         header_size = struct.unpack('<L', header_struct)[0]
+
+        log.debug('header size: {}'.format(header_size))
 
         # read in header bytestream
         header_bytes = await reader.readexactly(header_size)
         header = header_bytes.decode()
 
-        if header == 'CLASSES':
-            await self.handle_classes(reader, writer)
-        elif header == 'IMAGE':
-            await self.handle_image(reader, writer)
+        return header
+
+    # abstracted handler to receive messages
+    # assumes several mesages are sent over one connection
+    async def recv_message(self, reader, writer):
+        # while loop since scrubcam only uses one socket connection
+        # so we need to use the same callback instance
+        log.info('Connected to ScrubCam')
+        while True:
+            header = await self.handle_header(reader, writer)
+
+            if header == 'CLASSES':
+                await self.handle_classes(reader, writer)
+            elif header == 'IMAGE':
+                await self.handle_image(reader, writer)
 
     # reference:
     # https://github.com/CS131-TA-team/UCLA_CS131_CodeHelp/blob/master/Python/echo_server.py
@@ -104,7 +150,9 @@ class asyncio_server:
     # incoming messages
     # all incoming messages are handled by handle_echo(reader, writer)
     async def run_forever(self):
-        server = await asyncio.start_server(self.handle_echo, self.ip,
+        log.info('Server Started')
+        server = await asyncio.start_server(self.recv_message,
+                                            self.ip,
                                             self.port)
 
         async with server:
