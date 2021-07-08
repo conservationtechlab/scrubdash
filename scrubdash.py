@@ -2,7 +2,7 @@
 
 from multiprocessing import Process, Queue
 from asyncio_server import asyncio_server
-from dash_server import start_dash
+from multi_page_dash_server.dash_server import start_dash
 import argparse
 import logging
 
