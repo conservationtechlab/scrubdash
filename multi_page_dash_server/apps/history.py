@@ -159,6 +159,6 @@ def create_history_grid(selected_confidence, pathname):
 
 
 @app.callback(Output('slider-output-container', 'children'),
-                Input('confidence-slider', 'value'))
+              Input('confidence-slider', 'value'))
 def slidervalue(value):
     return 'You have selected a confidence of: {}'.format(value)

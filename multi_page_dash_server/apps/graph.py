@@ -119,10 +119,10 @@ def update_time_graph_class(fig, selected_class):
 
     if selected_class == 'All':
         fig = px.histogram(df,
-                            x="datetime",
-                            histfunc="count",
-                            title="Histogral for {} Class(es)"
-                            .format(selected_class.capitalize()))
+                           x="datetime",
+                           histfunc="count",
+                           title="Histogral for {} Class(es)"
+                           .format(selected_class.capitalize()))
     else:
         filtered_df = df[df['label'] == selected_class]
         fig = px.histogram(filtered_df, x="datetime")
