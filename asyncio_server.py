@@ -164,13 +164,7 @@ class asyncio_server:
             # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.Server.serve_forever
             await server.serve_forever()
 
-    def configure_record(self):
-        # check if record folder specified exists or not
-        record_exists = os.path.isdir(self.RECORD_FOLDER)
-
-        if not record_exists:
-            os.mkdir(self.RECORD_FOLDER)
-
+    def newrun_config(self):
         now = datetime.now()
         timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
         session_foldername = timestamp
@@ -184,7 +178,8 @@ class asyncio_server:
         summary_path = os.path.join(self.SESSION_PATH, summary_filename)
 
         with open(summary_path, 'a') as summary:
-            for key, value in yaml.load(open(self.CONFIG_FILE)).items():
+            for key, value in yaml.load(open(self.CONFIG_FILE),
+                                        Loader=yaml.SafeLoader).items():
                 summary.write('{}: {}\n'.format(key, value))
 
         # make image log csv
@@ -201,6 +196,45 @@ class asyncio_server:
             csv_writer.writerow(header)
 
         self.image_log = imagelog_path
+
+    def contrun_config(self):
+        all_subdirs = [os.path.join(self.RECORD_FOLDER, d)
+                       for d in os.listdir(self.RECORD_FOLDER)
+                       if os.path.isdir(os.path.join(self.RECORD_FOLDER, d))]
+
+        latest_subdir = max(all_subdirs, key=os.path.getmtime)
+
+        self.SESSION_PATH = latest_subdir
+
+        timestamp = latest_subdir.split('/')[-1]
+        imagelog_filename = '{}_imagelog.csv'.format(timestamp)
+        imagelog_path = os.path.join(self.SESSION_PATH, imagelog_filename)
+
+        # may be redundancy we can delete
+        if not os.path.isfile(imagelog_path):
+            # create image log since it's somehow not in the folder
+            with open(imagelog_path, 'a') as imagelog:
+                header = ['path', 'label', 'lboxes', 'timestamp', 'datetime']
+
+                csv_writer = csv.writer(imagelog,
+                                        delimiter=',',
+                                        quotechar='"',
+                                        quoting=csv.QUOTE_MINIMAL)
+                csv_writer.writerow(header)
+
+        self.image_log = imagelog_path
+
+    def configure_record(self):
+        # check if record folder specified exists or not
+        record_exists = os.path.isdir(self.RECORD_FOLDER)
+
+        if not record_exists:
+            os.mkdir(self.RECORD_FOLDER)
+
+        if self.NEW_RUN:
+            self.newrun_config()
+        else:
+            self.contrun_config()
 
     def start_server(self):
         try:
