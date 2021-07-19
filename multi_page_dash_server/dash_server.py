@@ -10,12 +10,12 @@ from .utils import create_image_dict
 log = logging.getLogger(__name__)
 
 
-def start_dash(queue):
+def start_dash(queue, dash_ip, dash_port):
 
     app.layout = html.Div(
         [
             dcc.Location(id='url', refresh=False),
-            dcc.Store(id='image-dict', data={}, storage_type='local'),
+            dcc.Store(id='image-dict', data={}, storage_type='session'),
             dcc.Interval(
                 id='interval-component',
                 interval=1.5 * 1000,  # in milliseconds
@@ -62,7 +62,7 @@ def start_dash(queue):
         else:
             return history.layout
 
-    app.run_server()
+    app.run_server(host=dash_ip, port=dash_port)
 
     # don't need to catch KeyboardInterrupt since app.run_server() catches the
     # keyboard interrupt to end the server.

@@ -15,8 +15,8 @@ class asyncio_server:
             queue,
             ip,
             port,
-            record_images_folder='saved_images/',
-            record_lboxes_folder='saved_lboxes/'):
+            record_images_folder,
+            record_lboxes_folder):
         self.queue = queue
         self.ip = ip
         self.port = port
