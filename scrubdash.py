@@ -9,8 +9,10 @@ from multi_page_dash_server.dash_server import start_dash
 
 parser = argparse.ArgumentParser()
 parser.add_argument('config_filename')
+parser.add_argument('-n', '--new', dest='new', action='store_true')
 args = parser.parse_args()
 CONFIG_FILE = args.config_filename
+NEW_RUN = args.new
 
 logging.basicConfig(level=logging.INFO,
                     format='[%(levelname)s] %(message)s (%(name)s)')
@@ -23,10 +25,7 @@ ASYNCIO_SERVER_IP = configs['ASYNCIO_SERVER_IP']
 ASYNCIO_SERVER_PORT = configs['ASYNCIO_SERVER_PORT']
 DASH_SERVER_IP = configs['DASH_SERVER_IP']
 DASH_SERVER_PORT = configs['DASH_SERVER_PORT']
-RECORD_IMAGES_FOLDER = configs['RECORD_IMAGES_FOLDER']
-RECORD_LBOXES_FOLDER = configs['RECORD_LBOXES_FOLDER']
-
-log.info(configs)
+RECORD_FOLDER = configs['RECORD_FOLDER']
 
 if __name__ == '__main__':
     pass
@@ -34,8 +33,9 @@ if __name__ == '__main__':
     asyncio_server = asyncio_server(q,
                                     ASYNCIO_SERVER_IP,
                                     ASYNCIO_SERVER_PORT,
-                                    RECORD_IMAGES_FOLDER,
-                                    RECORD_LBOXES_FOLDER)
+                                    RECORD_FOLDER,
+                                    NEW_RUN,
+                                    CONFIG_FILE)
     asyncio = Process(target=asyncio_server.start_server)
     dash = Process(target=start_dash, args=(q,
                                             DASH_SERVER_IP,

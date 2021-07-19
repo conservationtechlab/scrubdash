@@ -5,6 +5,7 @@ import pickle
 from datetime import datetime
 import logging
 import csv
+import yaml
 
 log = logging.getLogger(__name__)
 
@@ -15,17 +16,19 @@ class asyncio_server:
             queue,
             ip,
             port,
-            record_images_folder,
-            record_lboxes_folder):
+            record_folder,
+            new_run,
+            config_file):
         self.queue = queue
         self.ip = ip
         self.port = port
-        self.RECORD_IMAGES_FOLDER = record_images_folder
-        self.RECORD_LBOXES_FOLDER = record_lboxes_folder
+        self.RECORD_FOLDER = record_folder
+        self.NEW_RUN = new_run
+        self.CONFIG_FILE = config_file
 
     def _write_boxes_file(self, timestamp, lboxes):
         filename = '{}.csv'.format(timestamp)
-        full_filename = os.path.join(self.RECORD_LBOXES_FOLDER, filename)
+        full_filename = os.path.join(self.SESSION_PATH, filename)
         with open(full_filename, 'w') as f:
             self.csv_writer = csv.writer(f,
                                          delimiter=',',
@@ -45,7 +48,7 @@ class asyncio_server:
         dt_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
         image_filename = '{}_{}.jpeg'.format(timestamp, class_name)
-        image_path = os.path.join(self.RECORD_IMAGES_FOLDER, image_filename)
+        image_path = os.path.join(self.SESSION_PATH, image_filename)
 
         # saving image to disk
         with open(image_path, 'wb') as saved_img:
@@ -56,8 +59,8 @@ class asyncio_server:
 
         # update csv log that stores all image records
         # will want to change this to csv_writer to match _write_boxes_file()
-        with open('image_log.csv', 'a') as image_csv:
-            image_csv.write(
+        with open(self.image_log, 'a') as image_log:
+            image_log.write(
                 '{},{},{},{},{}\n'.format(
                     image_path,
                     class_name,
@@ -161,8 +164,47 @@ class asyncio_server:
             # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.Server.serve_forever
             await server.serve_forever()
 
+    def configure_record(self):
+        # check if record folder specified exists or not
+        record_exists = os.path.isdir(self.RECORD_FOLDER)
+
+        if not record_exists:
+            os.mkdir(self.RECORD_FOLDER)
+
+        now = datetime.now()
+        timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
+        session_foldername = timestamp
+        session_path = os.path.join(self.RECORD_FOLDER, session_foldername)
+        os.mkdir(session_path)
+
+        self.SESSION_PATH = session_path
+
+        # make summary text file
+        summary_filename = '{}_summary.txt'.format(timestamp)
+        summary_path = os.path.join(self.SESSION_PATH, summary_filename)
+
+        with open(summary_path, 'a') as summary:
+            for key, value in yaml.load(open(self.CONFIG_FILE)).items():
+                summary.write('{}: {}\n'.format(key, value))
+
+        # make image log csv
+        imagelog_filename = '{}_imagelog.csv'.format(timestamp)
+        imagelog_path = os.path.join(self.SESSION_PATH, imagelog_filename)
+
+        with open(imagelog_path, 'a') as imagelog:
+            header = ['path', 'label', 'lboxes', 'timestamp', 'datetime']
+
+            csv_writer = csv.writer(imagelog,
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
+            csv_writer.writerow(header)
+
+        self.image_log = imagelog_path
+
     def start_server(self):
         try:
+            self.configure_record()
             asyncio.run(self.run_forever())
         except KeyboardInterrupt:
             # I think asyncio.run() gracefully cleans up all resources on
