@@ -1,7 +1,7 @@
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
@@ -78,9 +78,10 @@ layout = html.Div([
 # Initializes the dropdown options when entering the graph page
 @app.callback(Output('dropdown', 'options'),
               Output('time-class', 'options'),
-              Input('url', 'pathname'))
-def initialize_graph_page(pathname):
-    df = pd.read_csv('image_log.csv')
+              Input('url', 'pathname'),
+              State('log-path', 'data'))
+def initialize_graph_page(pathname, log_path):
+    df = pd.read_csv(log_path)
 
     dropdown_options = [{'label': 'All', 'value': 'All'}]
 
@@ -98,9 +99,10 @@ def initialize_graph_page(pathname):
 
 # update histogram
 @app.callback(Output('histogram', 'figure'),
-              Input('dropdown', 'value'))
-def update_histogram(selected_value):
-    df = pd.read_csv('image_log.csv')
+              Input('dropdown', 'value'),
+              State('log-path', 'data'))
+def update_histogram(selected_value, log_path):
+    df = pd.read_csv(log_path)
     fig = None
 
     if selected_value == 'All':
@@ -114,8 +116,8 @@ def update_histogram(selected_value):
 
 # helper function for update_time_graph
 # updates the class displayed
-def update_time_graph_class(fig, selected_class):
-    df = pd.read_csv('image_log.csv')
+def update_time_graph_class(fig, selected_class, log_path):
+    df = pd.read_csv(log_path)
 
     if selected_class == 'All':
         fig = px.histogram(df,
@@ -172,10 +174,12 @@ def update_time_graph_x_axes(fig, selected_span, selected_interval):
 @app.callback(Output('time-graph', 'figure'),
               Input('time-class', 'value'),
               Input('time-span', 'value'),
-              Input('time-interval', 'value'))
-def update_time_graph(selected_class, selected_span, selected_interval):
+              Input('time-interval', 'value'),
+              State('log-path', 'data'))
+def update_time_graph(selected_class, selected_span,
+                      selected_interval, log_path):
     fig = None
-    fig = update_time_graph_class(fig, selected_class)
+    fig = update_time_graph_class(fig, selected_class, log_path)
     fig = update_time_graph_x_axes(fig, selected_span, selected_interval)
 
     return fig
