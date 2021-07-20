@@ -28,19 +28,28 @@ DASH_SERVER_PORT = configs['DASH_SERVER_PORT']
 RECORD_FOLDER = configs['RECORD_FOLDER']
 
 if __name__ == '__main__':
-    pass
     q = Queue()
+    log_queue = Queue()
     asyncio_server = asyncio_server(q,
+                                    log_queue,
                                     ASYNCIO_SERVER_IP,
                                     ASYNCIO_SERVER_PORT,
                                     RECORD_FOLDER,
                                     NEW_RUN,
                                     CONFIG_FILE)
+
     asyncio = Process(target=asyncio_server.start_server)
+    asyncio.start()
+
+    image_log = log_queue.get(block=True)
+    filter_classes = log_queue.get(block=True)
+
     dash = Process(target=start_dash, args=(q,
+                                            image_log,
+                                            filter_classes,
                                             DASH_SERVER_IP,
                                             DASH_SERVER_PORT))
-    asyncio.start()
+
     dash.start()
 
     try:

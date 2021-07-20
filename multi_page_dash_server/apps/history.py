@@ -111,12 +111,13 @@ layout = dbc.Container(
 # This also retriggers on refresh
 @app.callback(Output('history-class', 'data'),
               Output('image-csv', 'data'),
-              Input('url', 'pathname'))
-def display_history_page(pathname):
+              Input('url', 'pathname'),
+              State('log-path', 'data'))
+def display_history_page(pathname, log_path):
     # removes the '/' from the beginning of pathname
     animal = pathname[1:]
 
-    image_csv = pd.read_csv('image_log.csv')
+    image_csv = pd.read_csv(log_path)
 
     # resets the indices after dropping rows
     filtered = image_csv[image_csv['label'] == animal].reset_index(drop=True)

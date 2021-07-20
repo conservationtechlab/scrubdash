@@ -3,13 +3,16 @@ import pandas as pd
 
 
 # function to update image dictionary
-def create_image_dict(class_list):
+def create_image_dict(class_list, image_log):
     # create empty image dictionary
     image_dict = {}
 
+    if not class_list:
+        return image_dict
+
     # populate the image dictionary
     # initialize image path to most recent entry in image_log.csv
-    df = pd.read_csv('image_log.csv')
+    df = pd.read_csv(image_log)
 
     for classification in class_list:
         # resets the indices after dropping rows

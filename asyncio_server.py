@@ -14,6 +14,7 @@ class asyncio_server:
     def __init__(
             self,
             queue,
+            image_queue,
             ip,
             port,
             record_folder,
@@ -25,6 +26,7 @@ class asyncio_server:
         self.RECORD_FOLDER = record_folder
         self.NEW_RUN = new_run
         self.CONFIG_FILE = config_file
+        self.image_queue = image_queue
 
     def _write_boxes_file(self, timestamp, lboxes):
         filename = '{}.csv'.format(timestamp)
@@ -59,7 +61,7 @@ class asyncio_server:
 
         # update csv log that stores all image records
         # will want to change this to csv_writer to match _write_boxes_file()
-        with open(self.image_log, 'a') as image_log:
+        with open(self.IMAGE_LOG, 'a') as image_log:
             image_log.write(
                 '{},{},{},{},{}\n'.format(
                     image_path,
@@ -100,7 +102,8 @@ class asyncio_server:
         message = {
             "header": "IMAGE",
             "img_path": filename,
-            "label": class_name}
+            "label": class_name
+        }
         self.queue.put(message)
 
     async def handle_classes(self, reader, writer):
@@ -112,6 +115,13 @@ class asyncio_server:
         # read in class_list bytestream
         class_list_bytes = await reader.readexactly(class_list_size)
         class_list = pickle.loads(class_list_bytes)
+
+        self.FILTER_CLASSES = class_list
+
+        with open(self.SUMMARY_PATH, 'a') as summary:
+            # record user session
+            setting = {"FILTER_CLASSES": class_list}
+            yaml.dump(setting, summary, default_flow_style=None)
 
         # for debugging: print(class_list)
         # send class list to dash server
@@ -147,6 +157,10 @@ class asyncio_server:
             elif header == 'IMAGE':
                 await self.handle_image(reader, writer)
 
+    async def handle_session(self):
+        message = {"header": "LOG", "image_log": self.IMAGE_LOG}
+        self.queue.put(message)
+
     # reference:
     # https://github.com/CS131-TA-team/UCLA_CS131_CodeHelp/blob/master/Python/echo_server.py
     # creates a server that listens on localhost at port 8888 for
@@ -154,6 +168,8 @@ class asyncio_server:
     # all incoming messages are handled by handle_echo(reader, writer)
     async def run_forever(self):
         log.info('Server Started')
+        await self.handle_session()
+        log.info('Configuration finished')
         server = await asyncio.start_server(self.recv_message,
                                             self.ip,
                                             self.port)
@@ -173,20 +189,26 @@ class asyncio_server:
 
         self.SESSION_PATH = session_path
 
-        # make summary text file
-        summary_filename = '{}_summary.txt'.format(timestamp)
-        summary_path = os.path.join(self.SESSION_PATH, summary_filename)
+        # make summary yaml file
+        summary_filename = '{}_summary.yaml'.format(timestamp)
+        self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
 
-        with open(summary_path, 'a') as summary:
+        with open(self.SUMMARY_PATH, 'a') as summary:
+            # record user session
+            setting = {'USER_SESSION': self.SESSION_PATH}
+            yaml.dump(setting, summary, default_flow_style=False)
+
+            # record config settings
             for key, value in yaml.load(open(self.CONFIG_FILE),
                                         Loader=yaml.SafeLoader).items():
-                summary.write('{}: {}\n'.format(key, value))
+                setting = {key: value}
+                yaml.dump(setting, summary, default_flow_style=False)
 
         # make image log csv
         imagelog_filename = '{}_imagelog.csv'.format(timestamp)
-        imagelog_path = os.path.join(self.SESSION_PATH, imagelog_filename)
+        self.IMAGE_LOG = os.path.join(self.SESSION_PATH, imagelog_filename)
 
-        with open(imagelog_path, 'a') as imagelog:
+        with open(self.IMAGE_LOG, 'a') as imagelog:
             header = ['path', 'label', 'lboxes', 'timestamp', 'datetime']
 
             csv_writer = csv.writer(imagelog,
@@ -195,7 +217,10 @@ class asyncio_server:
                                     quoting=csv.QUOTE_MINIMAL)
             csv_writer.writerow(header)
 
-        self.image_log = imagelog_path
+        with open(self.SUMMARY_PATH, 'a') as summary:
+            # record image log
+            setting = {'IMAGE_LOG': self.IMAGE_LOG}
+            yaml.dump(setting, summary, default_flow_style=False)
 
     def contrun_config(self):
         all_subdirs = [os.path.join(self.RECORD_FOLDER, d)
@@ -206,14 +231,28 @@ class asyncio_server:
 
         self.SESSION_PATH = latest_subdir
 
+        # get filter_classes from yaml summary
         timestamp = latest_subdir.split('/')[-1]
+        summary_filename = '{}_summary.yaml'.format(timestamp)
+        self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
+
+        with open(self.SUMMARY_PATH) as f:
+            configs = yaml.load(f, Loader=yaml.SafeLoader)
+
+        try:
+            self.FILTER_CLASSES = configs['FILTER_CLASSES']
+        except KeyError:
+            self.FILTER_CLASSES = None
+
+        # get the image_log filename
         imagelog_filename = '{}_imagelog.csv'.format(timestamp)
-        imagelog_path = os.path.join(self.SESSION_PATH, imagelog_filename)
+        self.IMAGE_LOG = os.path.join(self.SESSION_PATH, imagelog_filename)
 
         # may be redundancy we can delete
-        if not os.path.isfile(imagelog_path):
+        # create image_log if not found in session folder
+        if not os.path.isfile(self.IMAGE_LOG):
             # create image log since it's somehow not in the folder
-            with open(imagelog_path, 'a') as imagelog:
+            with open(self.IMAGE_LOG, 'a') as imagelog:
                 header = ['path', 'label', 'lboxes', 'timestamp', 'datetime']
 
                 csv_writer = csv.writer(imagelog,
@@ -222,7 +261,15 @@ class asyncio_server:
                                         quoting=csv.QUOTE_MINIMAL)
                 csv_writer.writerow(header)
 
-        self.image_log = imagelog_path
+    def send_imagelog(self):
+        self.image_queue.put(self.IMAGE_LOG)
+
+    def send_classes(self):
+        try:
+            self.image_queue.put(self.FILTER_CLASSES)
+        except AttributeError:
+            self.FILTER_CLASSES = None
+            self.image_queue.put(self.FILTER_CLASSES)
 
     def configure_record(self):
         # check if record folder specified exists or not
@@ -235,6 +282,9 @@ class asyncio_server:
             self.newrun_config()
         else:
             self.contrun_config()
+
+        self.send_imagelog()
+        self.send_classes()
 
     def start_server(self):
         try:
