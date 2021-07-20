@@ -35,19 +35,21 @@ layout = dbc.Container(
                                 'type': 'grid-square',
                                 'index': j
                             },
-                            children=html.Div([
-                                html.Img(
-                                    id={
-                                        'type': 'sq-img',
-                                        'index': j
-                                    },
-                                    n_clicks=0),
-                                html.Div(
-                                    id={
-                                        'type': 'sq-header',
-                                        'index': j
-                                    })
-                            ])
+                            children=dbc.Spinner(
+                                children=html.Div([
+                                    html.Img(
+                                        id={
+                                            'type': 'sq-img',
+                                            'index': j
+                                        },
+                                        n_clicks=0),
+                                    html.Div(
+                                        id={
+                                            'type': 'sq-header',
+                                            'index': j
+                                        })
+                                ])
+                            )
                         )
                         for j in range(i*3, (i*3)+3)
                     ])
