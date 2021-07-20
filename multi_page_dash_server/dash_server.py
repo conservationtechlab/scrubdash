@@ -14,6 +14,7 @@ persistent_filter_classes = None
 
 def start_dash(queue, log_path, filter_classes, dash_ip, dash_port):
 
+    global persistent_filter_classes
     persistent_filter_classes = filter_classes
 
     app.layout = html.Div(
