@@ -44,12 +44,12 @@ class asyncio_server:
 
         return full_filename
 
-    def save_image_and_lboxes(self, image, class_name, lboxes):
+    def save_image_and_lboxes(self, image, detected_classes, lboxes):
         now = datetime.now()
         unix_timestamp = now.timestamp()
         dt_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
-        image_filename = '{}_{}.jpeg'.format(timestamp, class_name)
+        image_filename = '{}.jpeg'.format(timestamp)
         image_path = os.path.join(self.SESSION_PATH, image_filename)
 
         # saving image to disk
@@ -65,7 +65,7 @@ class asyncio_server:
             image_log.write(
                 '{},{},{},{},{}\n'.format(
                     image_path,
-                    class_name,
+                    '\"{}\"'.format(detected_classes),
                     lboxes_path,
                     unix_timestamp,
                     dt_timestamp))
@@ -84,8 +84,10 @@ class asyncio_server:
         lboxes_bytes = await reader.readexactly(lboxes_size)
         lboxes = pickle.loads(lboxes_bytes)
         log.debug('lboxes received: {}'.format(lboxes))
-        # ex: [{'class_name': 'cheetah'}]
-        class_name = lboxes[0]['class_name']
+
+        detected_classes = [lbox['class_name'] for lbox in lboxes]
+        # preserve only unique classes
+        detected_classes = list(set(detected_classes))
 
         # read size of image bytestream
         image_struct = await reader.read(struct.calcsize('<L'))
@@ -96,13 +98,13 @@ class asyncio_server:
         image = await reader.readexactly(image_size)
 
         # save image to disk and to the csv
-        filename = self.save_image_and_lboxes(image, class_name, lboxes)
+        filename = self.save_image_and_lboxes(image, detected_classes, lboxes)
 
         # send image path and class name to dash server
         message = {
             "header": "IMAGE",
             "img_path": filename,
-            "label": class_name
+            "labels": detected_classes
         }
         self.queue.put(message)
 
@@ -209,7 +211,7 @@ class asyncio_server:
         self.IMAGE_LOG = os.path.join(self.SESSION_PATH, imagelog_filename)
 
         with open(self.IMAGE_LOG, 'a') as imagelog:
-            header = ['path', 'label', 'lboxes', 'timestamp', 'datetime']
+            header = ['path', 'labels', 'lboxes', 'timestamp', 'datetime']
 
             csv_writer = csv.writer(imagelog,
                                     delimiter=',',
@@ -253,7 +255,7 @@ class asyncio_server:
         if not os.path.isfile(self.IMAGE_LOG):
             # create image log since it's somehow not in the folder
             with open(self.IMAGE_LOG, 'a') as imagelog:
-                header = ['path', 'label', 'lboxes', 'timestamp', 'datetime']
+                header = ['path', 'labels', 'lboxes', 'timestamp', 'datetime']
 
                 csv_writer = csv.writer(imagelog,
                                         delimiter=',',

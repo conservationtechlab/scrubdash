@@ -91,7 +91,7 @@ def initialize_graph_page(pathname, log_path):
                                 'label': animal.capitalize(),
                                 'value': animal
                             }
-                            for animal in df.label.unique()
+                            for animal in df.labels.unique()
                         ]
 
     return dropdown_options, dropdown_options
@@ -106,10 +106,10 @@ def update_histogram(selected_value, log_path):
     fig = None
 
     if selected_value == 'All':
-        fig = px.histogram(df, x="label")
+        fig = px.histogram(df, x="labels")
     else:
-        filtered_df = df[df['label'] == selected_value]
-        fig = px.histogram(filtered_df, x="label")
+        filtered_df = df[df['labels'].str.contains(selected_value)]
+        fig = px.histogram(filtered_df, x="labels")
 
     return fig
 
@@ -126,7 +126,7 @@ def update_time_graph_class(fig, selected_class, log_path):
                            title="Histogral for {} Class(es)"
                            .format(selected_class.capitalize()))
     else:
-        filtered_df = df[df['label'] == selected_class]
+        filtered_df = df[df['labels'].str.contains(selected_class)]
         fig = px.histogram(filtered_df, x="datetime")
 
     fig.update_layout(bargap=0.2)

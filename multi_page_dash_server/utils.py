@@ -16,7 +16,8 @@ def create_image_dict(class_list, image_log):
 
     for classification in class_list:
         # resets the indices after dropping rows
-        filtered = df[df['label'] == classification].reset_index(drop=True)
+        filtered = df[df['labels'].str.contains(
+            classification)].reset_index(drop=True)
         # sorts paths in descending order (most recent to least recent)
         filtered.sort_values(ascending=False, by=['path'], inplace=True)
 

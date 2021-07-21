@@ -14,6 +14,10 @@ persistent_filter_classes = None
 
 def start_dash(queue, log_path, filter_classes, dash_ip, dash_port):
 
+    # necessary for when the actual list for filter_classes is not available on
+    # dash start-up since scrubcam has not connected to asyncio yet. However,
+    # we want dash to be running anyway so the "waiting to connect to
+    # scurbdash..." page can be shown to the user.
     global persistent_filter_classes
     persistent_filter_classes = filter_classes
 
@@ -59,8 +63,12 @@ def start_dash(queue, log_path, filter_classes, dash_ip, dash_port):
             # short circuits out if image_dict is empty
             elif image_dict and header == 'IMAGE':
                 filename = message['img_path']
-                class_name = message['label']
-                image_dict[class_name] = filename
+                detected_classes = message['labels']
+
+                # filter out extraneous classes
+                for class_name in detected_classes:
+                    if class_name in persistent_filter_classes:
+                        image_dict[class_name] = filename
 
         # no change is made to image_dict if it is empty and an image
         # is received
