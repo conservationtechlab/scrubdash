@@ -18,13 +18,13 @@ class asyncio_server:
             ip,
             port,
             record_folder,
-            new_run,
+            continue_run,
             config_file):
         self.queue = queue
         self.ip = ip
         self.port = port
         self.RECORD_FOLDER = record_folder
-        self.NEW_RUN = new_run
+        self.CONTINUE_RUN = continue_run
         self.CONFIG_FILE = config_file
         self.image_queue = image_queue
 
@@ -86,8 +86,12 @@ class asyncio_server:
         log.debug('lboxes received: {}'.format(lboxes))
 
         detected_classes = [lbox['class_name'] for lbox in lboxes]
-        # preserve only unique classes
-        detected_classes = list(set(detected_classes))
+        # preserve only the classes in filter_classes
+        detected_classes = [class_name for class_name in detected_classes
+                            if class_name in self.FILTER_CLASSES]
+        # preserve only unique classes and preserve ordering by confidence
+        # descending.
+        detected_classes = list(dict.fromkeys(detected_classes))
 
         # read size of image bytestream
         image_struct = await reader.read(struct.calcsize('<L'))
@@ -270,6 +274,9 @@ class asyncio_server:
         try:
             self.image_queue.put(self.FILTER_CLASSES)
         except AttributeError:
+            # catch if scrubcam is not connected to scrubdash yet
+            # send empty filter_class list for now and asyncio will send the
+            # actual list when it connects to scrubdash.
             self.FILTER_CLASSES = None
             self.image_queue.put(self.FILTER_CLASSES)
 
@@ -280,10 +287,10 @@ class asyncio_server:
         if not record_exists:
             os.mkdir(self.RECORD_FOLDER)
 
-        if self.NEW_RUN:
-            self.newrun_config()
-        else:
+        if self.CONTINUE_RUN:
             self.contrun_config()
+        else:
+            self.newrun_config()
 
         self.send_imagelog()
         self.send_classes()

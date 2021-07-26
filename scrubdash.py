@@ -9,10 +9,11 @@ from multi_page_dash_server.dash_server import start_dash
 
 parser = argparse.ArgumentParser()
 parser.add_argument('config_filename')
-parser.add_argument('-n', '--new', dest='new', action='store_true')
+parser.add_argument('-c', '--cont', dest='cont', action='store_true')
 args = parser.parse_args()
+print(args)
 CONFIG_FILE = args.config_filename
-NEW_RUN = args.new
+CONTINUE_RUN = args.cont
 
 logging.basicConfig(level=logging.INFO,
                     format='[%(levelname)s] %(message)s (%(name)s)')
@@ -35,7 +36,7 @@ if __name__ == '__main__':
                                     ASYNCIO_SERVER_IP,
                                     ASYNCIO_SERVER_PORT,
                                     RECORD_FOLDER,
-                                    NEW_RUN,
+                                    CONTINUE_RUN,
                                     CONFIG_FILE)
 
     asyncio = Process(target=asyncio_server.start_server)

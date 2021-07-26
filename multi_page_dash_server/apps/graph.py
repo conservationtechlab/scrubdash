@@ -5,7 +5,9 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
+import yaml
 import logging
+import ast
 
 from ..app import app
 
@@ -35,6 +37,7 @@ time_intervals = [
 layout = html.Div([
     dbc.Container([
         html.H1('Aggregate Counts by Class'),
+        dcc.Store(id='label-count'),
         dcc.Dropdown(
             id='dropdown',
             value='All'),
@@ -75,59 +78,94 @@ layout = html.Div([
 ])
 
 
-# Initializes the dropdown options when entering the graph page
+# Initializes the dropdown options when entering the graph page.
+# 'filter-classes' must be an Input or else there will be callback problems.
+# Passing 'filter-classes' as a State will result in a None value on the
+# initial call since there is no default 'data' value for 'filter-classes'
 @app.callback(Output('dropdown', 'options'),
               Output('time-class', 'options'),
+              Output('label-count', 'data'),
               Input('url', 'pathname'),
+              Input('filter-classes', 'data'),
+              State('image-dict', 'data'),
               State('log-path', 'data'))
-def initialize_graph_page(pathname, log_path):
-    df = pd.read_csv(log_path)
-
+def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
+    # create options list
     dropdown_options = [{'label': 'All', 'value': 'All'}]
 
-    # adds dropdown option for every animal class
+    # adds dropdown option for every filter_class
     dropdown_options += [
-                            {
-                                'label': animal.capitalize(),
-                                'value': animal
-                            }
-                            for animal in df.labels.unique()
-                        ]
+        {
+            'label': filter_class.capitalize(),
+            'value': filter_class
+        }
+        for filter_class in filter_classes
+    ]
 
-    return dropdown_options, dropdown_options
+    # create dataframe of label counts from image log
+    df = pd.read_csv(log_path)
+    # transform cell content from str to list
+    labels_col = df['labels'].apply((lambda arr: ast.literal_eval(arr)))
+    labels_col = labels_col.to_list()
+    datetime_col = df['datetime'].to_list()
+
+    # create dataframe that flattens each label into its own row with its
+    # datetime
+    data = []
+
+    for row_index in range(len(labels_col)):
+        labels = labels_col[row_index]
+        datetime_entry = datetime_col[row_index]
+        for label in labels:
+            data += [[label, datetime_entry]]
+
+    label_df = pd.DataFrame(data, columns=['label', 'datetime'])
+
+    # converts the pandas dataframe to json to be stored in dcc.Store()
+    json_result = label_df.to_json(orient='index')
+
+    return dropdown_options, dropdown_options, json_result
 
 
 # update histogram
 @app.callback(Output('histogram', 'figure'),
               Input('dropdown', 'value'),
-              State('log-path', 'data'))
-def update_histogram(selected_value, log_path):
-    df = pd.read_csv(log_path)
+              Input('label-count', 'data'))
+def update_histogram(selected_value, json_df):
+    # converts label-count from a json to a pandas dataframe
+    df = pd.read_json(json_df, orient='index')
+
     fig = None
 
     if selected_value == 'All':
-        fig = px.histogram(df, x="labels")
+        fig = px.histogram(df,
+                           x="label",
+                           title="Count of all classes recorded in the "
+                                 "image log")
     else:
-        filtered_df = df[df['labels'].str.contains(selected_value)]
-        fig = px.histogram(filtered_df, x="labels")
+        filtered_df = df[df['label'] == (selected_value)]
+        fig = px.histogram(filtered_df,
+                           x="label",
+                           title="Count of {} class recorded in the image log"
+                                 .format(selected_value))
 
     return fig
 
 
 # helper function for update_time_graph
 # updates the class displayed
-def update_time_graph_class(fig, selected_class, log_path):
-    df = pd.read_csv(log_path)
-
+def update_time_graph_class(fig, selected_class, df):
     if selected_class == 'All':
         fig = px.histogram(df,
                            x="datetime",
                            histfunc="count",
-                           title="Histogral for {} Class(es)"
-                           .format(selected_class.capitalize()))
+                           title="Histogram for All Classes")
     else:
-        filtered_df = df[df['labels'].str.contains(selected_class)]
-        fig = px.histogram(filtered_df, x="datetime")
+        filtered_df = df[df['label'] == selected_class]
+        fig = px.histogram(filtered_df,
+                           x="datetime",
+                           title="Histogram for {} Class"
+                           .format(selected_class.capitalize()))
 
     fig.update_layout(bargap=0.2)
 
@@ -158,14 +196,17 @@ def update_time_graph_x_axes(fig, selected_span, selected_interval):
 
     now = datetime.now()
 
-    start_time = now-span_options[selected_span]
-    start_time_formatted = start_time.strftime('%Y-%m-%d')
+    start_time = now - span_options[selected_span]
+    start_time_formatted = start_time.strftime('%Y-%m-%d %H:%M:%S')
 
     time_interval = interval_options[selected_interval]
 
+    # TODO: update tick intervals to be readable
+    # https://plotly.com/python/tick-formatting/
     fig.update_traces(xbins_start=start_time_formatted,
                       xbins_size=time_interval)
-    fig.update_xaxes(dtick=time_interval)
+    # tickmode='auto' may be a good fix to improve readability
+    fig.update_xaxes(tickmode='auto')
 
     return fig
 
@@ -175,11 +216,15 @@ def update_time_graph_x_axes(fig, selected_span, selected_interval):
               Input('time-class', 'value'),
               Input('time-span', 'value'),
               Input('time-interval', 'value'),
-              State('log-path', 'data'))
+              Input('label-count', 'data'))
 def update_time_graph(selected_class, selected_span,
-                      selected_interval, log_path):
+                      selected_interval, json_df):
+
+    # converts label-count from a json to a pandas dataframe
+    df = pd.read_json(json_df, orient='index')
+
     fig = None
-    fig = update_time_graph_class(fig, selected_class, log_path)
+    fig = update_time_graph_class(fig, selected_class, df)
     fig = update_time_graph_x_axes(fig, selected_span, selected_interval)
 
     return fig

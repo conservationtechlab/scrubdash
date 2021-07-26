@@ -26,6 +26,7 @@ def start_dash(queue, log_path, filter_classes, dash_ip, dash_port):
             dcc.Location(id='url', refresh=False),
             dcc.Store(id='log-path'),
             dcc.Store(id='image-dict'),
+            dcc.Store(id='filter-classes'),
             dcc.Interval(
                 id='interval-component',
                 interval=1.5 * 1000,  # in milliseconds
@@ -43,8 +44,11 @@ def start_dash(queue, log_path, filter_classes, dash_ip, dash_port):
     def get_log_path(n_clicks):
         return log_path
 
-    # checks shared queue every 2 seconds to update image dictionary
+    # checks shared queue every 2 seconds to update image dictionary.
+    # also checks if filter classes list is passed (occurs only if scrubcam
+    # connects after starting scrubdash.)
     @app.callback(Output('image-dict', 'data'),
+                  Output('filter-classes', 'data'),
                   Input('interval-component', 'n_intervals'),
                   State('image-dict', 'data'))
     def update_image_dict(n_intervals, image_dict):
@@ -70,13 +74,13 @@ def start_dash(queue, log_path, filter_classes, dash_ip, dash_port):
                     if class_name in persistent_filter_classes:
                         image_dict[class_name] = filename
 
-        # no change is made to image_dict if it is empty and an image
-        # is received
-
+        # error catch: no change is made to image_dict if it is empty and an
+        # image is received
         if not image_dict:
             image_dict = create_image_dict(persistent_filter_classes, log_path)
 
-        return image_dict
+        # persistent_filter_classes only changes if header == 'CLASSES'
+        return image_dict,  persistent_filter_classes
 
     # Update the page
     @app.callback(Output('page-content', 'children'),
