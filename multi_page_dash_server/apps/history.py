@@ -35,21 +35,23 @@ layout = dbc.Container(
                                 'type': 'grid-square',
                                 'index': j
                             },
-                            children=html.Div([
-                                html.Img(
-                                    id={
-                                        'type': 'sq-img',
-                                        'index': j
-                                    },
-                                    n_clicks=0),
-                                html.Div(
-                                    id={
-                                        'type': 'sq-header',
-                                        'index': j
-                                    })
-                            ])
+                            children=dbc.Spinner(
+                                children=html.Div([
+                                    html.Img(
+                                        id={
+                                            'type': 'sq-img',
+                                            'index': j
+                                        },
+                                        n_clicks=0),
+                                    html.Div(
+                                        id={
+                                            'type': 'sq-header',
+                                            'index': j
+                                        })
+                                ])
+                            )
                         )
-                        for j in range(i*3, (i*3)+3)
+                        for j in range(i * 3, (i * 3) + 3)
                     ])
                     for i in range(3)
                 ]),
@@ -111,15 +113,17 @@ layout = dbc.Container(
 # This also retriggers on refresh
 @app.callback(Output('history-class', 'data'),
               Output('image-csv', 'data'),
-              Input('url', 'pathname'))
-def display_history_page(pathname):
+              Input('url', 'pathname'),
+              State('log-path', 'data'))
+def display_history_page(pathname, log_path):
     # removes the '/' from the beginning of pathname
     animal = pathname[1:]
 
-    image_csv = pd.read_csv('image_log.csv')
+    image_csv = pd.read_csv(log_path)
 
     # resets the indices after dropping rows
-    filtered = image_csv[image_csv['label'] == animal].reset_index(drop=True)
+    filtered = image_csv[image_csv['labels'].str.contains(
+        animal)].reset_index(drop=True)
     # sorts paths in descending order (most recent to least recent)
     filtered.sort_values(ascending=False, by=['path'], inplace=True)
 
@@ -162,7 +166,7 @@ def create_history_grid(prev_squares, index_handle, pathname, page, json_df):
     # gets a list of animal images and lboxes
     image_list = filtered_csv[['path', 'lboxes', 'datetime']].values.tolist()
 
-    image_index = (page*9)+index
+    image_index = (page * 9) + index
     image_count = len(image_list)
 
     if image_index < image_count:
@@ -181,7 +185,7 @@ def create_history_grid(prev_squares, index_handle, pathname, page, json_df):
         display = {'display': 'none'}
 
     # resize image to show in grid
-    source_img = source_img.resize((round(1920/8), round(1080/8)))
+    source_img = source_img.resize((round(1920 / 8), round(1080 / 8)))
 
     # create temporary buffer to get image binary
     buffer = BytesIO()
@@ -339,7 +343,7 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
                           '{}, {}'.format(class_name, confidence),
                           font=font)
 
-    source_img = source_img.resize((round(1920/2), round(1080/2)))
+    source_img = source_img.resize((round(1920 / 2), round(1080 / 2)))
 
     # create temporary buffer to get image binary
     buffer = BytesIO()
