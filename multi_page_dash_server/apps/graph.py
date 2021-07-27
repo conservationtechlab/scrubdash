@@ -5,7 +5,6 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-import yaml
 import logging
 import ast
 
@@ -73,7 +72,9 @@ layout = html.Div([
                 value='24H'
             ),
         ]),
-        dcc.Graph(id='time-graph'),
+        html.Div([
+            dcc.Graph(id='time-graph'),
+        ])
     ])
 ])
 
@@ -107,6 +108,7 @@ def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
     # transform cell content from str to list
     labels_col = df['labels'].apply((lambda arr: ast.literal_eval(arr)))
     labels_col = labels_col.to_list()
+    timestamp_col = df['timestamp'].to_list()
     datetime_col = df['datetime'].to_list()
 
     # create dataframe that flattens each label into its own row with its
@@ -115,11 +117,12 @@ def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
 
     for row_index in range(len(labels_col)):
         labels = labels_col[row_index]
+        timestamp = timestamp_col[row_index]
         datetime_entry = datetime_col[row_index]
         for label in labels:
-            data += [[label, datetime_entry]]
+            data += [[label, timestamp, datetime_entry]]
 
-    label_df = pd.DataFrame(data, columns=['label', 'datetime'])
+    label_df = pd.DataFrame(data, columns=['label', 'timestamp', 'datetime'])
 
     # converts the pandas dataframe to json to be stored in dcc.Store()
     json_result = label_df.to_json(orient='index')
@@ -172,7 +175,7 @@ def update_time_graph_class(fig, selected_class, df):
     return fig
 
 
-def update_time_graph_x_axes(fig, selected_span, selected_interval):
+def update_time_graph_x_axes(fig, selected_span, selected_interval, df):
     span_options = {
         'hour': timedelta(hours=1),
         'day': timedelta(days=1),
@@ -197,16 +200,43 @@ def update_time_graph_x_axes(fig, selected_span, selected_interval):
     now = datetime.now()
 
     start_time = now - span_options[selected_span]
-    start_time_formatted = start_time.strftime('%Y-%m-%d %H:%M:%S')
+    filtered_df = df[df['timestamp'] >= start_time]
 
-    time_interval = interval_options[selected_interval]
+    # No results found for selected span
+    if len(filtered_df) == 0:
+        fig = {
+            "layout": {
+                "xaxis": {
+                    "visible": False
+                },
+                "yaxis": {
+                    "visible": False
+                },
+                "annotations": [
+                    {
+                        "text": "No matching data found",
+                        "xref": "paper",
+                        "yref": "paper",
+                        "showarrow": False,
+                        "font": {
+                            "size": 28
+                        }
+                    }
+                ]
+            }
+        }
+    # Results exist in selected span
+    else:
+        start_time_formatted = start_time.strftime('%Y-%m-%d %H:%M:%S')
 
-    # TODO: update tick intervals to be readable
-    # https://plotly.com/python/tick-formatting/
-    fig.update_traces(xbins_start=start_time_formatted,
-                      xbins_size=time_interval)
-    # tickmode='auto' may be a good fix to improve readability
-    fig.update_xaxes(tickmode='auto')
+        time_interval = interval_options[selected_interval]
+
+        # TODO: update tick intervals to be readable
+        # https://plotly.com/python/tick-formatting/
+        fig.update_traces(xbins_start=start_time_formatted,
+                          xbins_size=time_interval)
+        # tickmode='auto' may be a good fix to improve readability
+        fig.update_xaxes(tickmode='auto')
 
     return fig
 
@@ -222,9 +252,8 @@ def update_time_graph(selected_class, selected_span,
 
     # converts label-count from a json to a pandas dataframe
     df = pd.read_json(json_df, orient='index')
-
     fig = None
     fig = update_time_graph_class(fig, selected_class, df)
-    fig = update_time_graph_x_axes(fig, selected_span, selected_interval)
+    fig = update_time_graph_x_axes(fig, selected_span, selected_interval, df)
 
     return fig
