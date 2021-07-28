@@ -7,6 +7,8 @@ import logging
 import csv
 import yaml
 
+from notification import email_sender
+
 log = logging.getLogger(__name__)
 
 
@@ -27,6 +29,12 @@ class asyncio_server:
         self.CONTINUE_RUN = continue_run
         self.CONFIG_FILE = config_file
         self.image_queue = image_queue
+
+        # Email notification member variables
+        with open(self.CONFIG_FILE) as f:
+            configs = yaml.load(f, Loader=yaml.SafeLoader)
+        self.ALERT_CLASSES = configs['ALERT_CLASSES']
+        self.email_sender = email_sender(self.CONFIG_FILE)
 
     def _write_boxes_file(self, timestamp, lboxes):
         filename = '{}.csv'.format(timestamp)
@@ -111,6 +119,14 @@ class asyncio_server:
             "labels": detected_classes
         }
         self.queue.put(message)
+
+        # send email notification if an alert class is detected
+        alert_set = set(self.ALERT_CLASSES)
+        detected_set = set(detected_classes)
+        notify_classes = alert_set.intersection(detected_set)
+
+        if len(notify_classes) > 0:
+            self.email_sender.send_email(filename, list(notify_classes))
 
     async def handle_classes(self, reader, writer):
         # read size of class list bytestream
