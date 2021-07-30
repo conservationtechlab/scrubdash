@@ -3,9 +3,9 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import logging
 
-from .app import app
-from .apps import grid, history, graph
-from .utils import create_image_dict
+from scrubdash.dash_server.app import app
+from scrubdash.dash_server.apps import grid, history, graph
+from scrubdash.dash_server.utils import create_image_dict
 
 log = logging.getLogger(__name__)
 

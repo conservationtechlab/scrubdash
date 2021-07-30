@@ -7,7 +7,7 @@ import logging
 import csv
 import yaml
 
-from notification import email_sender
+from scrubdash.asyncio_server.notification import email_sender
 
 log = logging.getLogger(__name__)
 

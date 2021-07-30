@@ -7,7 +7,7 @@ import base64
 import numpy as np
 import logging
 
-from ..app import app
+from scrubdash.dash_server.app import app
 
 log = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ import ast
 import numpy as np
 import logging
 
-from ..app import app
+from scrubdash.dash_server.app import app
 
 log = logging.getLogger(__name__)
 
@@ -336,8 +336,9 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
                 draw.rectangle([upper_left_corner,
                                 lower_right_corner])
 
-                font = ImageFont.truetype('Roboto/Roboto-Medium.ttf',
-                                          48)
+                font_path = ('scrubdash/dash_server/assets/'
+                             'Roboto/Roboto-Medium.ttf')
+                font = ImageFont.truetype(font_path, 48)
 
                 draw.text((upper_left_corner),
                           '{}, {}'.format(class_name, confidence),

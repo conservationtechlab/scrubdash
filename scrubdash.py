@@ -4,8 +4,8 @@ import yaml
 import logging
 
 from multiprocessing import Process, Queue
-from asyncio_server import asyncio_server
-from multi_page_dash_server.dash_server import start_dash
+from scrubdash.dash_server.dash_server import start_dash
+import scrubdash.asyncio_server.asyncio_server as a_s
 
 parser = argparse.ArgumentParser()
 parser.add_argument('config_filename')
@@ -28,16 +28,17 @@ DASH_SERVER_IP = configs['DASH_SERVER_IP']
 DASH_SERVER_PORT = configs['DASH_SERVER_PORT']
 RECORD_FOLDER = configs['RECORD_FOLDER']
 
-if __name__ == '__main__':
+
+def main():
     q = Queue()
     log_queue = Queue()
-    asyncio_server = asyncio_server(q,
-                                    log_queue,
-                                    ASYNCIO_SERVER_IP,
-                                    ASYNCIO_SERVER_PORT,
-                                    RECORD_FOLDER,
-                                    CONTINUE_RUN,
-                                    CONFIG_FILE)
+    asyncio_server = a_s.asyncio_server(q,
+                                        log_queue,
+                                        ASYNCIO_SERVER_IP,
+                                        ASYNCIO_SERVER_PORT,
+                                        RECORD_FOLDER,
+                                        CONTINUE_RUN,
+                                        CONFIG_FILE)
 
     asyncio = Process(target=asyncio_server.start_server)
     asyncio.start()
@@ -61,3 +62,7 @@ if __name__ == '__main__':
         while asyncio.is_alive() or dash.is_alive():
             pass
         log.info('Successfully shut down scrubdash.')
+
+
+if __name__ == "__main__":
+    main()
