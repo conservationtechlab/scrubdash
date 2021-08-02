@@ -1,0 +1,9 @@
+dash
+dash_core_components
+pandas
+numpy
+dash_bootstrap_components
+plotly
+dash_html_components
+Pillow
+PyYAML
