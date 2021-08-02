@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import logging
 import ast
 
-from ..app import app
+from scrubdash.dash_server.app import app
 
 log = logging.getLogger(__name__)
 
