@@ -45,7 +45,7 @@ setuptools.setup(
         'Development Status :: 2 - Pre-Alpha',
         'Topic :: Scientific/Engineering',
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     entry_points={'console_scripts': ["scrubdash=scrubdash.__main__:main"]},
     include_package_data=True
 )
