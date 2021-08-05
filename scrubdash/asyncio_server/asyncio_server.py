@@ -171,10 +171,15 @@ class asyncio_server:
 
         self.FILTER_CLASSES = class_list
 
-        with open(self.SUMMARY_PATH, 'a') as summary:
-            # record user session
-            setting = {"FILTER_CLASSES": class_list}
-            yaml.dump(setting, summary, default_flow_style=None)
+        # add FILTER_CLASSES if not in summary yaml
+        summary_keys = yaml.load(open(self.SUMMARY_PATH),
+                                 Loader=yaml.SafeLoader).keys()
+
+        if 'FILTER_CLASSES' not in summary_keys:
+            with open(self.SUMMARY_PATH, 'a') as summary:
+                # add FILTER_CLASSES to summary
+                setting = {"FILTER_CLASSES": class_list}
+                yaml.dump(setting, summary, default_flow_style=None)
 
         # for debugging: print(class_list)
         # send class list to dash server
