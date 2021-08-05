@@ -2,27 +2,27 @@ import os
 import asyncio
 import struct
 import pickle
-from datetime import datetime
 import logging
 import csv
+import time
+from datetime import datetime
+
 import yaml
 
-from scrubdash.asyncio_server.notification import email_sender
-from scrubdash.asyncio_server.sms import sms_sender
+from scrubdash.asyncio_server.notification import notification
 
 log = logging.getLogger(__name__)
 
 
 class asyncio_server:
-    def __init__(
-            self,
-            queue,
-            image_queue,
-            ip,
-            port,
-            record_folder,
-            continue_run,
-            config_file):
+    def __init__(self,
+                 queue,
+                 image_queue,
+                 ip,
+                 port,
+                 record_folder,
+                 continue_run,
+                 config_file):
         self.queue = queue
         self.ip = ip
         self.port = port
@@ -35,8 +35,17 @@ class asyncio_server:
         with open(self.CONFIG_FILE) as f:
             configs = yaml.load(f, Loader=yaml.SafeLoader)
         self.ALERT_CLASSES = configs['ALERT_CLASSES']
-        self.email_sender = email_sender(self.CONFIG_FILE)
-        self.sms_sender = sms_sender(self.CONFIG_FILE)
+        self.COOLDOWN_TIME = configs['COOLDOWN_TIME']
+        self.LAST_ALERT_TIME = None
+        self.SENDER = configs['SENDER']
+        self.SENDER_PASSWORD = configs['SENDER_PASSWORD']
+        self.EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
+        self.SMS_RECEIVERS = configs['SMS_RECEIVERS']
+
+        self.notification = notification(self.SENDER,
+                                         self.SENDER_PASSWORD,
+                                         self.EMAIL_RECEIVERS,
+                                         self.SMS_RECEIVERS)
 
     def _write_boxes_file(self, timestamp, lboxes):
         filename = '{}.csv'.format(timestamp)
@@ -122,14 +131,32 @@ class asyncio_server:
         }
         self.queue.put(message)
 
-        # send sms and email notification if an alert class is detected
+        # check if an alert class is detected
         alert_set = set(self.ALERT_CLASSES)
         detected_set = set(detected_classes)
         notify_classes = alert_set.intersection(detected_set)
 
-        if len(notify_classes) > 0:
-            self.email_sender.send_email(filename, list(notify_classes))
-            await self.sms_sender.send_sms(filename, list(notify_classes))
+        # check if cooldown time has elapsed since most recent alert
+        if self.LAST_ALERT_TIME is None:
+            # This is the first alert being sent
+            cooldown_elapsed = True
+        else:
+            # get current time and check if cooldown time has elapsed
+            now = time.time()
+            time_diff = now - self.LAST_ALERT_TIME
+            log.info("time diff: {}".format(time_diff))
+            if time_diff >= self.COOLDOWN_TIME:
+                cooldown_elapsed = True
+            else:
+                cooldown_elapsed = False
+
+        # send sms and email alert if alert classes are detected and cooldown
+        # time has elapsed
+        if len(notify_classes) > 0 and cooldown_elapsed:
+            self.notification.send_email(filename, list(notify_classes))
+            await self.notification.send_sms(filename, list(notify_classes))
+            last_alert_time = time.time()
+            self.LAST_ALERT_TIME = last_alert_time
             # asyncio.run(coro)
 
     async def handle_classes(self, reader, writer):
