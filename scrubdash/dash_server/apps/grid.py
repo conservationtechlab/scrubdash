@@ -1,11 +1,12 @@
+import logging
+import base64
+from io import BytesIO
+
+import numpy as np
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 from PIL import Image
-from io import BytesIO
-import base64
-import numpy as np
-import logging
 
 from scrubdash.dash_server.app import app
 
@@ -32,6 +33,23 @@ layout = dbc.Container(
 @app.callback(Output('grid-content', 'children'),
               Input('image-dict', 'data'))
 def update_grid(image_dict):
+    """
+    Updates grid images when the image dictionary changes
+
+    Parameters
+    ----------
+    image_dict : dict of { 'class_name' : str }
+        The dictionary that maps the most recent image for each
+        class_name. The image is represented as the absolute path
+        to the image
+
+    Returns
+    -------
+    Dash HTML Component
+        The grid page layout written with Dash HTML Components. It
+        shows the most recent images received for each class in filter
+        classes
+    """
     # change nothing if image dictionary is empty
     if not image_dict:
         return "Waiting to connect to scrubcam..."
@@ -40,8 +58,7 @@ def update_grid(image_dict):
     row = []
     col = 0
 
-    # put 3 columns in a row
-    # put 1 image per column
+    # put 3 columns in a row with 1 image per column
     # image base64 reference: https://stackoverflow.com/questions/
     # 3715493/encoding-an-image-file-with-base64
     for class_name, filename in image_dict.items():
@@ -77,15 +94,12 @@ def update_grid(image_dict):
 
         if col == 3:
             col = 0
-            # need to copy since I'm reusing the row variable and
-            # python stores values in a dict as a pointer. To avoid
-            # overwriting data, I make a copy.
-            grid.append(dbc.Row(row.copy()))
+            grid.append(dbc.Row(row))
             row = []
 
     # if we didn't have a multiple of 3 images, the last row never
-    # got appended to grid
+    # got appended to grid. So we need to append it now
     if col != 0:
-        grid.append(dbc.Row(row.copy()))
+        grid.append(dbc.Row(row))
 
     return grid

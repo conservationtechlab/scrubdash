@@ -15,55 +15,133 @@ log = logging.getLogger(__name__)
 
 
 class asyncio_server:
+    """
+    Asynchronous server that receives messages from `scrubcam` and
+    persistently saves data (images and lboxes) to disk.
+
+    ...
+
+    Attributes
+    ----------
+    dash_queue : multiprocessing.Queue
+        The shared queue that allows communication between the asyncio
+        server and dash server
+    scrubdash_queue : multiprocessing.Queue
+        The shared queue that allows communication between the asyncio
+        server and its parent scrubdash process
+    ip : str
+        The IP address used to receive messages on
+    port : int
+        The port number used to receive messages on
+    record_folder : str
+        The folder location to save user sessions in
+    continue_run : bool
+        A flag used to signify a new user session
+    config_file : str
+        The file location of the configuration file
+    ALERT_CLASSES : list of str
+        The list of classes to send a notification for if observed in a
+        received image
+    COOLDOWN_TIME : int
+        The number of seconds that must elapse before another
+        notification can be sent
+    LAST_ALERT_TIME : float or int
+        The unix time for the most recently sent notification
+    """
     def __init__(self,
-                 queue,
-                 image_queue,
+                 dash_queue,
+                 scrubdash_queue,
                  ip,
                  port,
                  record_folder,
                  continue_run,
                  config_file):
-        self.queue = queue
+        """
+        Parameters
+        ----------
+        dash_queue : multiprocessing.Queue
+            The shared queue that allows communication between the
+            asyncio server and dash server
+        scrubdash_queue : multiprocessing.Queue
+            The shared queue that allows communication between the
+            asyncio server and its parent scrubdash process
+        ip : str
+            The IP address used to receive messages on
+        port : int
+            The port number used to receive messages on
+        record_folder : str
+            The folder location to save user sessions in
+        continue_run : bool
+            A flag used to signify a new user session
+        config_file : str
+            The file location of the configuration file
+        """
+        self.dash_queue = dash_queue
+        self.scrubdash_queue = scrubdash_queue
         self.ip = ip
         self.port = port
         self.RECORD_FOLDER = record_folder
         self.CONTINUE_RUN = continue_run
         self.CONFIG_FILE = config_file
-        self.image_queue = image_queue
 
-        # Email and SMS notification member variables
+        # Email and SMS control flow variables
         with open(self.CONFIG_FILE) as f:
             configs = yaml.load(f, Loader=yaml.SafeLoader)
         self.ALERT_CLASSES = configs['ALERT_CLASSES']
         self.COOLDOWN_TIME = configs['COOLDOWN_TIME']
         self.LAST_ALERT_TIME = None
-        self.SENDER = configs['SENDER']
-        self.SENDER_PASSWORD = configs['SENDER_PASSWORD']
-        self.EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
-        self.SMS_RECEIVERS = configs['SMS_RECEIVERS']
 
-        self.notification = notification(self.SENDER,
-                                         self.SENDER_PASSWORD,
-                                         self.EMAIL_RECEIVERS,
-                                         self.SMS_RECEIVERS)
+        # Email and SMS notification member variables
+        SENDER = configs['SENDER']
+        SENDER_PASSWORD = configs['SENDER_PASSWORD']
+        EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
+        SMS_RECEIVERS = configs['SMS_RECEIVERS']
+
+        self.notification = notification(SENDER,
+                                         SENDER_PASSWORD,
+                                         EMAIL_RECEIVERS,
+                                         SMS_RECEIVERS)
 
     def _write_boxes_file(self, timestamp, lboxes):
+        # writes the lboxes to a comma separated value file (.csv) and
+        # returns the path of the file
         filename = '{}.csv'.format(timestamp)
         full_filename = os.path.join(self.SESSION_PATH, filename)
-        with open(full_filename, 'w') as f:
-            self.csv_writer = csv.writer(f,
-                                         delimiter=',',
-                                         quotechar='"',
-                                         quoting=csv.QUOTE_MINIMAL)
+        with open(full_filename, 'w') as lboxes_csv:
+            csv_writer = csv.writer(lboxes_csv,
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
             for lbox in lboxes:
-                self.csv_writer.writerow([lbox['class_name'],
-                                          lbox['confidence'],
-                                          *lbox['box']])
+                csv_writer.writerow([lbox['class_name'],
+                                     lbox['confidence'],
+                                     *lbox['box']])
                 log.info('Loggged {}'.format(lbox['class_name']))
 
         return full_filename
 
-    def save_image_and_lboxes(self, image, detected_classes, lboxes):
+    def _save_image_and_lboxes(self, image, detected_classes, lboxes):
+        """
+        Saves the image to disk, writes the lboxes to a csv file, and
+        records image metadata to the image log.
+
+        Parameters
+        ----------
+        image : bytes
+            The bytes object representation of an image
+        detected_classes : list of str
+            The list of classes detected in the image
+        lboxes : list of dict of { 'class_id' : int,
+                                   'confidence' : float,
+                                   'box' : list of int,
+                                   'class_name' : str }
+            The list of lboxes for each object identified in the image
+
+        Returns
+        -------
+        str
+            The saved location of the image
+        """
         now = datetime.now()
         unix_timestamp = now.timestamp()
         dt_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -71,30 +149,45 @@ class asyncio_server:
         image_filename = '{}.jpeg'.format(timestamp)
         image_path = os.path.join(self.SESSION_PATH, image_filename)
 
-        # saving image to disk
-        with open(image_path, 'wb') as saved_img:
-            saved_img.write(image)
+        # saves image to disk
+        with open(image_path, 'wb') as image_file:
+            image_file.write(image)
 
-        # saving lboxes to csv
+        # saves lboxes to a csv file
         lboxes_path = self._write_boxes_file(timestamp, lboxes)
 
-        # update csv log that stores all image records
-        # will want to change this to csv_writer to match _write_boxes_file()
+        # update image log that stores all image records
         with open(self.IMAGE_LOG, 'a') as image_log:
-            image_log.write(
-                '{},{},{},{},{}\n'.format(
-                    image_path,
-                    '\"{}\"'.format(detected_classes),
-                    lboxes_path,
-                    unix_timestamp,
-                    dt_timestamp))
+            csv_writer = csv.writer(image_log,
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
+
+            csv_writer.writerow([image_path,
+                                 detected_classes,
+                                 lboxes_path,
+                                 unix_timestamp,
+                                 dt_timestamp])
 
         return image_path
 
     # handles image socket messages
     async def handle_image(self, reader, writer):
-        log.info("handling image")
+        """
+        Reads the bytestreams of the lboxes and of the image from
+        ScrubCam and saves them to disk. This method also sends the SMS
+        and email notifications and sends the image to ScrubDash so it
+        can be shown as the most recent image on the main grid.
 
+        Parameters
+        ----------
+        reader : asyncio.StreamReader
+            A reader object that provides APIs to read data from the IO
+            stream
+        writer : asyncio.StreamWriter
+            A writer object that provides APIs to write data to the IO
+            stream
+        """
         # read size of lboxes struct
         lboxes_struct = await reader.read(struct.calcsize('<L'))
         lboxes_size = struct.unpack('<L', lboxes_struct)[0]
@@ -121,7 +214,9 @@ class asyncio_server:
         image = await reader.readexactly(image_size)
 
         # save image to disk and to the csv
-        filename = self.save_image_and_lboxes(image, detected_classes, lboxes)
+        filename = self._save_image_and_lboxes(image,
+                                               detected_classes,
+                                               lboxes)
 
         # send image path and class name to dash server
         message = {
@@ -129,7 +224,7 @@ class asyncio_server:
             "img_path": filename,
             "labels": detected_classes
         }
-        self.queue.put(message)
+        self.dash_queue.put(message)
 
         # check if an alert class is detected
         alert_set = set(self.ALERT_CLASSES)
@@ -144,7 +239,7 @@ class asyncio_server:
             # get current time and check if cooldown time has elapsed
             now = time.time()
             time_diff = now - self.LAST_ALERT_TIME
-            log.info("time diff: {}".format(time_diff))
+
             if time_diff >= self.COOLDOWN_TIME:
                 cooldown_elapsed = True
             else:
@@ -157,9 +252,25 @@ class asyncio_server:
             await self.notification.send_sms(filename, list(notify_classes))
             last_alert_time = time.time()
             self.LAST_ALERT_TIME = last_alert_time
-            # asyncio.run(coro)
+
+        log.info("Finished processing image")
 
     async def handle_classes(self, reader, writer):
+        """
+        Reads the bytestream of the class list from ScrubCam and writes it
+        to the summary yaml file if it is not already written. This method
+        also sends class list to ScrubDash so it can initialize the main
+        grid.
+
+        Parameters
+        ----------
+        reader : asyncio.StreamReader
+            A reader object that provides APIs to read data from the IO
+            stream
+        writer : asyncio.StreamWriter
+            A writer object that provides APIs to write data to the IO
+            stream
+        """
         # read size of class list bytestream
         class_list_struct = await reader.read(struct.calcsize('<L'))
         class_list_size = struct.unpack('<L', class_list_struct)[0]
@@ -181,19 +292,32 @@ class asyncio_server:
                 setting = {"FILTER_CLASSES": class_list}
                 yaml.dump(setting, summary, default_flow_style=None)
 
-        # for debugging: print(class_list)
         # send class list to dash server
         message = {"header": "CLASSES", "class_list": class_list}
-        self.queue.put(message)
+        self.dash_queue.put(message)
 
-    # reads in messages from client and delegates reading messages
-    # based on header received
     async def handle_header(self, reader, writer):
+        """
+        Reads the bytestream of the message header from ScrubCam.
+
+        Parameters
+        ----------
+        reader : asyncio.StreamReader
+            A reader object that provides APIs to read data from the IO
+            stream
+        writer : asyncio.StreamWriter
+            A writer object that provides APIs to write data to the IO
+            stream
+
+        Returns
+        -------
+        str
+            The message header describing what the contents of the
+            message are
+        """
         # read size of header bytestream
         header_struct = await reader.read(struct.calcsize('<L'))
         header_size = struct.unpack('<L', header_struct)[0]
-
-        log.debug('header size: {}'.format(header_size))
 
         # read in header bytestream
         header_bytes = await reader.readexactly(header_size)
@@ -201,12 +325,13 @@ class asyncio_server:
 
         return header
 
-    # abstracted handler to receive messages
-    # assumes several mesages are sent over one connection
-    async def recv_message(self, reader, writer):
+    async def _recv_message(self, reader, writer):
+        # abstracted handler to receive messages
+        # assumes several mesages are sent over one connection
+        log.info('Connected to ScrubCam')
+
         # while loop since scrubcam only uses one socket connection
         # so we need to use the same callback instance
-        log.info('Connected to ScrubCam')
         while True:
             header = await self.handle_header(reader, writer)
 
@@ -215,30 +340,32 @@ class asyncio_server:
             elif header == 'IMAGE':
                 await self.handle_image(reader, writer)
 
-    async def handle_session(self):
-        message = {"header": "LOG", "image_log": self.IMAGE_LOG}
-        self.queue.put(message)
-
     # reference:
     # https://github.com/CS131-TA-team/UCLA_CS131_CodeHelp/blob/master/Python/echo_server.py
     # creates a server that listens on localhost at port 8888 for
     # incoming messages
     # all incoming messages are handled by handle_echo(reader, writer)
     async def run_forever(self):
+        """
+        The asyncio coroutine that starts acceping connections until
+        cancelled.
+        """
         log.info('Server Started')
-        await self.handle_session()
-        log.info('Configuration finished')
-        server = await asyncio.start_server(self.recv_message,
+        server = await asyncio.start_server(self._recv_message,
                                             self.ip,
                                             self.port)
 
         async with server:
-            # the server will listen forever until we cancel recv_message()
-            # cancelling recv_message() automatically closes the server ref:
+            # the server will listen forever until we cancel _recv_message()
+            # cancelling _recv_message() automatically closes the server ref:
             # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.Server.serve_forever
             await server.serve_forever()
 
-    def newrun_config(self):
+    def new_run_config(self):
+        """
+        Configures the asyncio server for a new run (new session). The
+        user session folder, image log, and summary file are created.
+        """
         now = datetime.now()
         timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
         session_foldername = timestamp
@@ -280,7 +407,12 @@ class asyncio_server:
             setting = {'IMAGE_LOG': self.IMAGE_LOG}
             yaml.dump(setting, summary, default_flow_style=False)
 
-    def contrun_config(self):
+    def cont_run_config(self):
+        """
+        Configures the asyncio server for a continuing run. The most
+        recent user session folder, image log, and summary files are
+        retrieved.
+        """
         all_subdirs = [os.path.join(self.RECORD_FOLDER, d)
                        for d in os.listdir(self.RECORD_FOLDER)
                        if os.path.isdir(os.path.join(self.RECORD_FOLDER, d))]
@@ -306,33 +438,30 @@ class asyncio_server:
         imagelog_filename = '{}_imagelog.csv'.format(timestamp)
         self.IMAGE_LOG = os.path.join(self.SESSION_PATH, imagelog_filename)
 
-        # may be redundancy we can delete
-        # create image_log if not found in session folder
-        if not os.path.isfile(self.IMAGE_LOG):
-            # create image log since it's somehow not in the folder
-            with open(self.IMAGE_LOG, 'a') as imagelog:
-                header = ['path', 'labels', 'lboxes', 'timestamp', 'datetime']
-
-                csv_writer = csv.writer(imagelog,
-                                        delimiter=',',
-                                        quotechar='"',
-                                        quoting=csv.QUOTE_MINIMAL)
-                csv_writer.writerow(header)
-
     def send_imagelog(self):
-        self.image_queue.put(self.IMAGE_LOG)
+        """
+        Sends the image log path to ScrubDash.
+        """
+        self.scrubdash_queue.put(self.IMAGE_LOG)
 
     def send_classes(self):
+        """
+        Sends the class list to ScrubDash.
+        """
         try:
-            self.image_queue.put(self.FILTER_CLASSES)
+            self.scrubdash_queue.put(self.FILTER_CLASSES)
         except AttributeError:
             # catch if scrubcam is not connected to scrubdash yet
             # send empty filter_class list for now and asyncio will send the
             # actual list when it connects to scrubdash.
             self.FILTER_CLASSES = None
-            self.image_queue.put(self.FILTER_CLASSES)
+            self.scrubdash_queue.put(self.FILTER_CLASSES)
 
     def configure_record(self):
+        """
+        Wrapper method that configures user session data and sends the
+        image log path and class list to ScrubDash.
+        """
         # check if record folder specified exists or not
         record_exists = os.path.isdir(self.RECORD_FOLDER)
 
@@ -340,16 +469,22 @@ class asyncio_server:
             os.mkdir(self.RECORD_FOLDER)
 
         if self.CONTINUE_RUN:
-            self.contrun_config()
+            self.cont_run_config()
         else:
-            self.newrun_config()
+            self.new_run_config()
 
         self.send_imagelog()
         self.send_classes()
 
     def start_server(self):
+        """
+        Configures all user session data and executes the asyncio
+        coroutine that starts the event loop to receive messages from
+        ScrubCam.
+        """
         try:
             self.configure_record()
+            log.info('Configuration finished')
             asyncio.run(self.run_forever())
         except KeyboardInterrupt:
             # I think asyncio.run() gracefully cleans up all resources on

@@ -27,6 +27,23 @@ CARRIER_MAP = {
 
 
 class notification:
+    """
+    A class that represents a notification sender
+
+    ...
+
+    Attributes
+    ----------
+    SENDER : str
+        The email used to send out notifications
+    SENDER_PASSWORD : str
+        The password for the email used to send out notifications
+    EMAIL_RECEIVERS : list of str
+        The list of emails notifications will be sent to
+    SMS_RECEIVERS: list of dict of { 'num' : int, 'carrier' : str }
+        The list of dictionaries containing phone numbers and service
+        carriers that notifications will be sent to
+    """
     def __init__(self,
                  sender,
                  sender_password,
@@ -38,9 +55,23 @@ class notification:
         self.SMS_RECEIVERS = sms_receivers
 
     def _get_datetime(self, image_path):
-        # get filename
+        """
+        Parses the date and time from the image path
+
+        Parameters
+        ----------
+        image_path : str
+            The absolute path of the image
+
+        Returns
+        -------
+        tuple of (str, str)
+            The date in yyyy-mm-dd format and the time in HHhMMmSSs
+            format. An example is (2021-08-06, 02h16m05s)
+        """
+        # get filename from path
         filename = image_path.split('/')[-1]
-        # remove .xxx.jpeg ending
+        # remove .xxx.jpeg filename ending
         filename = filename[:-9]
         # split the datetime on 'T'
         datetime = filename.split('T')
@@ -50,9 +81,18 @@ class notification:
 
         return (date, time)
 
-    # source https://github.com/acamso/demos/blob/master/_email/send_txt_msg.py
-    # pylint: disable=too-many-arguments
     async def send_sms(self, image_path, notify_classes):
+        """
+        Sends an SMS notification to receivers passed to initializer
+
+        Parameters
+        ----------
+        image_path : str
+            The absolute path of the image
+        notify_classes : list of str
+            The list of classes to alert the receiver of. This list will
+            be put in the notification message.
+        """
         date, time = self._get_datetime(image_path)
 
         for receiver in self.SMS_RECEIVERS:
@@ -94,6 +134,17 @@ class notification:
             log.info(msg)
 
     def send_email(self, image_path, notify_classes):
+        """
+        Sends an email notification to receivers passed to initializer
+
+        Parameters
+        ----------
+        image_path : str
+            The absolute path of the image
+        notify_classes : list of str
+            The list of classes to alert the receiver of. This list will
+            be put in the notification message.
+        """
         port = 465  # For SSL
         smtp_server = "smtp.gmail.com"
 
