@@ -1,12 +1,13 @@
+import ast
+import logging
+from datetime import datetime, timedelta
+
+import pandas as pd
+import plotly.express as px
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
-import pandas as pd
-import plotly.express as px
-from datetime import datetime, timedelta
-import logging
-import ast
 
 from scrubdash.dash_server.app import app
 
@@ -43,10 +44,6 @@ layout = html.Div([
         dcc.Graph(id='histogram')
     ]),
     dbc.Container([
-        # specify string constant as number of pieces
-        # necessary to make the string be under 80 col
-        # ref:
-        # https://stackoverflow.com/questions/1874592/how-to-write-very-long-string-that-conforms-with-pep8-and-prevent-e501
         html.H1(('Looking at Images by Class, Time Span, and Time '
                  'Interval')),
         html.Div([
@@ -91,6 +88,35 @@ layout = html.Div([
               State('image-dict', 'data'),
               State('log-path', 'data'))
 def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
+    """
+    Initializes the dropdown options for each graph and the transformed
+    dataframe for the histogram and time graph
+
+    Parameters
+    ----------
+    pathname : str
+        The pathname of the url in window.location
+    filter_classes : list of str
+        The list of classes the scrubcam filters images for
+    image_dict : dict of { 'class_name' : str }
+        The dictionary that maps the most recent image for each
+        class_name. The image is represented as the absolute path
+        to the image
+    log_path : str
+        The absolute path of the image log for the current user session
+
+    Returns
+    -------
+    list of dict of { 'label': str, 'value': str }
+        A list of dictionaries containing the label that renders as a
+        dropdown option and the associated value for the backend
+    list of dict of { 'label': str, 'value': str }
+        A list of dictionaries containing the label that renders as a
+        dropdown option and the associated value for the backend
+    json
+        A json representation of the transformed dataframe used by the
+        histogram and time graph
+    """
     # create options list
     dropdown_options = [{'label': 'All', 'value': 'All'}]
 
@@ -135,6 +161,22 @@ def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
               Input('dropdown', 'value'),
               Input('label-count', 'data'))
 def update_histogram(selected_value, json_df):
+    """
+    Updates the class shown in the histogram
+
+    Parameters
+    ----------
+    selected_value : str
+        The class selected in the histogram dropdown
+    json_df
+        A json representation of the transformed dataframe used by the
+        histogram and time graph
+
+    Returns
+    -------
+    plotly.express.histogram
+        A plotly histogram object
+    """
     # converts label-count from a json to a pandas dataframe
     df = pd.read_json(json_df, orient='index')
 
@@ -158,6 +200,21 @@ def update_histogram(selected_value, json_df):
 # helper function for update_time_graph
 # updates the class displayed
 def update_time_graph_class(fig, selected_class, df):
+    """
+    Updates the class shown in the time graph
+
+    Parameters
+    ----------
+    selected_class : str
+        The selected class to show on the time graph
+    df
+        The transformed dataframe used by the histogram and time graph
+
+    Returns
+    -------
+    plotly.express.histogram
+        A plotly histogram object
+    """
     if selected_class == 'All':
         fig = px.histogram(df,
                            x="datetime",
@@ -176,6 +233,23 @@ def update_time_graph_class(fig, selected_class, df):
 
 
 def update_time_graph_x_axes(fig, selected_span, selected_interval, df):
+    """
+    Updates the domain and bucket size of the x-axis in the time graph
+
+    Parameters
+    ----------
+    selected_span : str
+        The selected domain to show on the time graph x-axis
+    selected_interval : str
+        The selected interval to bin each bucket
+    df
+        The transformed dataframe used by the histogram and time graph
+
+    Returns
+    -------
+    plotly.express.histogram
+        A plotly histogram object
+    """
     span_options = {
         'hour': timedelta(hours=1),
         'day': timedelta(days=1),
@@ -249,7 +323,26 @@ def update_time_graph_x_axes(fig, selected_span, selected_interval, df):
               Input('label-count', 'data'))
 def update_time_graph(selected_class, selected_span,
                       selected_interval, json_df):
+    """
+    Updates the time graph when a selected dropdown option changes
 
+    Parameters
+    ----------
+    selected_class : str
+        The selected class to show on the time graph
+    selected_span : str
+        The selected domain to show on the time graph x-axis
+    selected_interval : str
+        The selected interval to bin each bucket
+    json_df
+        A json representation of the transformed dataframe used by the
+        histogram and time graph
+
+    Returns
+    -------
+    plotly.express.histogram
+        A plotly histogram object
+    """
     # converts label-count from a json to a pandas dataframe
     df = pd.read_json(json_df, orient='index')
     fig = None

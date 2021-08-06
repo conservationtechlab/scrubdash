@@ -1,9 +1,27 @@
 import base64
+
 import pandas as pd
 
 
 # function to update image dictionary
 def create_image_dict(class_list, image_log):
+    """
+    Updates the image dictionary used by the dash server
+
+    Parameters
+    ----------
+    class_list : list of str
+        The list of classes the scrubcam filters images for
+    image_log : str
+        The absolute path of the image log for the current user session
+
+    Returns
+    -------
+    dict of { 'class_name' : str }
+        An updated dictionary that maps the most recent image for each
+        each class_name. The image is represented as the absolute path
+        to the image
+    """
     # create empty image dictionary
     image_dict = {}
 
@@ -35,6 +53,20 @@ def create_image_dict(class_list, image_log):
 
 # returns base64 encoding of image
 def get_base64_image(filename):
+    """
+    Decodes a bytes-like image file into an ASCII string to be used as
+    an HTML img source
+
+    Parameters
+    ----------
+    filename : str
+        The absolute path of the image file
+
+    Returns
+    -------
+    str
+        An ASCII decoding of the image bytes
+    """
     base64_image = None
     if filename is None:
         return ""
