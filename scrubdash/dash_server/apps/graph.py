@@ -232,7 +232,8 @@ def update_time_graph_class(fig, selected_class, df):
     return fig
 
 
-def update_time_graph_x_axes(fig, selected_span, selected_interval, df):
+def update_time_graph_x_axes(fig, selected_class, selected_span,
+                             selected_interval, df):
     """
     Updates the domain and bucket size of the x-axis in the time graph
 
@@ -272,9 +273,14 @@ def update_time_graph_x_axes(fig, selected_span, selected_interval, df):
     }
 
     now = datetime.now()
-
     start_time = now - span_options[selected_span]
-    filtered_df = df[df['timestamp'] >= start_time]
+
+    if selected_class == 'All':
+        class_df = df
+    else:
+        class_df = df[df['label'] == selected_class]
+
+    filtered_df = class_df[class_df['timestamp'] >= start_time]
 
     # No results found for selected span
     if len(filtered_df) == 0:
@@ -347,6 +353,10 @@ def update_time_graph(selected_class, selected_span,
     df = pd.read_json(json_df, orient='index')
     fig = None
     fig = update_time_graph_class(fig, selected_class, df)
-    fig = update_time_graph_x_axes(fig, selected_span, selected_interval, df)
+    fig = update_time_graph_x_axes(fig,
+                                   selected_class,
+                                   selected_span,
+                                   selected_interval,
+                                   df)
 
     return fig
