@@ -1,9 +1,13 @@
-dash
-dash_core_components
+dash_daq
+numpy 
+dash 
+dash_html_components
+dash_bootstrap_components 
+dash_core_components 
 pandas
 numpy
 dash_bootstrap_components
 plotly
-dash_html_components
+aiosmtplib
 Pillow
 PyYAML
