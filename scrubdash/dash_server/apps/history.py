@@ -5,6 +5,7 @@ import logging
 from io import BytesIO
 
 import dash
+import dash_daq as daq
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
@@ -64,17 +65,34 @@ layout = dbc.Container(
                         children=[
                             html.Div(
                                 [
-                                    dcc.Slider(
+                                    dcc.RangeSlider(
                                         id='confidence-slider',
                                         min=0,
                                         max=1,
                                         step=0.05,
-                                        value=.6
+                                        value=[0, .6]
                                     ),
                                     html.Div(id='slider-output-container'),
                                 ]),
                             html.Img(
-                                id='modal-img')
+                                id='modal-img'
+                            ),
+                            dbc.Button(
+                                "Pick font color",
+                                color='primary',
+                                id='collapse-button',
+                                n_clicks=0
+                            ),
+                            dbc.Collapse(
+                                daq.ColorPicker(
+                                    id='color-picker',
+                                    label=('Color Picker'
+                                           '(alpha value not supported)'),
+                                    value=dict(rgb=dict(r=0, g=0, b=0))
+                                ),
+                                id='collapse-body',
+                                is_open=False
+                            )
                         ]),
                     dbc.ModalFooter(
                         dbc.Button(
@@ -255,27 +273,27 @@ def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
     img_data = buffer.getvalue()
     base64_image = base64.b64encode(img_data).decode('ascii')
 
-    return 'data:image/png;base64,{}'.format(base64_image), header, display
+    return 'data:image/jpeg;base64,{}'.format(base64_image), header, display
 
 
 # shows user what the slider value is
 @app.callback(Output('slider-output-container', 'children'),
               Input('confidence-slider', 'value'))
-def slider_value(value):
+def slider_value(values):
     """
     Shows the slider value in the modal window
 
     Parameters
     ----------
-    value : float
-        The selected value of the confidence slider
+    values : list of float
+        The selected minimum and maximum values of the confidence slider
 
     Returns
     -------
     str
         A message displaying the selected confidence
     """
-    return 'You have selected a confidence of: {}'.format(value)
+    return 'You have selected a confidence interval of: {}'.format(values)
 
 
 # updates page index on button click
@@ -383,13 +401,14 @@ def render_buttons(page, json_df):
               Input({'type': 'sq-img', 'index': ALL}, 'n_clicks'),
               Input('close', 'n_clicks'),
               Input('confidence-slider', 'value'),
+              Input('color-picker', 'value'),
               State({'type': 'sq-header', 'index': ALL}, 'children'),
               State('modal-header', 'children'),
               State('modal', 'is_open'),
               State('image-csv', 'data'),
               prevent_initial_call=True)
-def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
-                 modal_header, modal_open, json_df):
+def toggle_modal(img_clicks, close_btn, selected_confidence, font_color,
+                 img_headers, modal_header, modal_open, json_df):
     """
     Opens a modal component when an image in the history grid is
     clicked on
@@ -401,8 +420,17 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
         has been clicked on
     close_btn : int
         The number of times the button has been clicked on
-    selected_confidence : float
-        The selected value of the confidence slider
+    selected_confidence : list of float
+        The selected minimum and maximum values of the confidence
+        slider
+    font_color : dict of { 'hex': str,
+                               'rgb': dict of { 'rgb' : 'r': int,
+                                                        'g': int,
+                                                        'b': int,
+                                                        'a': int
+                                              }
+                             }
+        The hex and rgb value of the selected font color
     img_headers : list of str
         A list of the timestamps for each image rendered in the history
         grid
@@ -440,12 +468,17 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
             return False, '', ''
 
         if trigger == 'confidence-slider':
-            # user clicked outside modal component to close
-            # callback triggered by resetting slider value to 0.6 but modal
-            # is_open is False
+            # user clicked outside modal component to close this
+            # callback triggered by resetting the slider value to 0.6
+            # in the reset_slider callback but modal is_open is False
             if not modal_open:
                 return False, '', ''
 
+            # find square index of image
+            np_img_headers = np.array(img_headers)
+            square = int(np.where(np_img_headers == modal_header)[0][0])
+
+        if trigger == 'color-picker':
             # find square index of image
             np_img_headers = np.array(img_headers)
             square = int(np.where(np_img_headers == modal_header)[0][0])
@@ -459,10 +492,22 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
     image = image_list[0]
     image_path = image[0]
 
+    # open image as bytes
     source_img = Image.open(image_path).convert('RGB')
     draw = ImageDraw.Draw(source_img)
 
+    # get csv containing lboxes
     csv_path = image[1]
+
+    # get confidence min and max from range slider
+    confidence_min = selected_confidence[0]
+    confidence_max = selected_confidence[1]
+
+    # get rgb from color picker
+    rgb = font_color['rgb']
+    font_color = (rgb['r'], rgb['g'], rgb['b'])
+
+    # draw lboxes onto image
     with open(csv_path, newline='') as lboxes:
         reader = csv.reader(lboxes,
                             delimiter=',',
@@ -473,7 +518,7 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
             class_name = lbox[0]
             confidence = float(lbox[1])
 
-            if confidence >= selected_confidence:
+            if confidence >= confidence_min and confidence <= confidence_max:
                 upper_left_x = int(lbox[2])
                 upper_left_y = int(lbox[3])
                 width = int(lbox[4])
@@ -486,7 +531,8 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
                 lower_right_corner = (lower_right_x, lower_right_y)
 
                 draw.rectangle([upper_left_corner,
-                                lower_right_corner])
+                                lower_right_corner],
+                               outline=font_color)
 
                 font_path = ('scrubdash/dash_server/assets/'
                              'Roboto/Roboto-Medium.ttf')
@@ -494,8 +540,10 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
 
                 draw.text((upper_left_corner),
                           '{}, {}'.format(class_name, confidence),
+                          fill=font_color,
                           font=font)
 
+    # resize image to show in modal component
     source_img = source_img.resize((round(1920 / 2), round(1080 / 2)))
 
     # create temporary buffer to get image binary
@@ -504,7 +552,7 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
     img_data = buffer.getvalue()
     base64_image = base64.b64encode(img_data).decode('ascii')
 
-    return True, 'data:image/png;base64,{}'.format(base64_image), image[2]
+    return True, 'data:image/jpeg;base64,{}'.format(base64_image), image[2]
 
 
 # resets slider value to 0.6 after closing the modal component
@@ -512,25 +560,103 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, img_headers,
               Input('modal', 'is_open'),
               State('confidence-slider', 'value'),
               prevent_initial_call=True)
-def reset_slider(modal, selected_confidence):
+def reset_slider(modal_open, selected_confidence):
     """
     Resets the confidence slider value to 0.6 after closing the modal
     component
 
     Parameters
     ----------
-    modal : bool
+    modal_open : bool
         A boolean that describes if the modal component is open or not
-    selected_confidence : float
-        The selected value of the confidence slider
+    selected_confidence : list of float
+        The selected minimum and maximum values of the confidence slider
 
     Returns
     -------
-    float
-        The selected value of the confidence slider
+    list of float
+        The selected minimum and maximum values of the confidence slider
     """
     # modal window is closed so reset slider value
-    if not modal:
-        return 0.6
+    if not modal_open:
+        return [0, 0.6]
 
     return selected_confidence
+
+
+# resets color-picker to black font color after closing the modal component
+@app.callback(Output('color-picker', 'value'),
+              Input('modal', 'is_open'),
+              State('color-picker', 'value'),
+              prevent_initial_call=True)
+def reset_color_picker(modal_open, font_color):
+    """
+    Resets color-picker to black font color after closing the modal
+    component
+
+    Parameters
+    ----------
+    modal_open : bool
+        A boolean that describes if the modal component is open or not
+    font_color : dict of { 'hex': str,
+                               'rgb': dict of { 'rgb' : 'r': int,
+                                                        'g': int,
+                                                        'b': int,
+                                                        'a': int
+                                              }
+                             }
+        The hex and rgb value of the selected font color
+
+    Returns
+    -------
+    dict of { 'rgb': dict of { 'rgb' : 'r': int,
+                                       'g': int,
+                                       'b': int
+                             }
+            }
+        The rgb value of the selected font color
+    """
+    # modal window is closed so reset font color
+    if not modal_open:
+        return dict(rgb=dict(r=0, g=0, b=0))
+
+    return font_color
+
+
+@app.callback(Output('collapse-body', 'is_open'),
+              Input('collapse-button', 'n_clicks'),
+              Input('modal', 'is_open'),
+              State('collapse-body', 'is_open'),
+              prevent_initial_call=True)
+def toggle_collapse(n_clicks, modal_open, collapse_open):
+    """
+    Toggles visibility of collapse component on button click. Also
+    hides collapse component when the modal component closes.
+
+    Parameters
+    ----------
+    modal_open : bool
+        A boolean that describes if the modal component is open or not
+    collapse_open : bool
+        A boolean that describes if the collapse component is visible
+        or not
+
+    Returns
+    -------
+    bool
+        A boolean that describes if the collapse component is visible
+        or not
+    """
+    # get the id of the component that triggered the callback
+    ctx = dash.callback_context
+    trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+    if trigger == 'modal':
+        if not modal_open:
+            # modal component is closed so collapse the body
+            return False
+
+        # do nothing if modal component is opened
+        return collapse_open
+
+    if trigger == 'collapse-button':
+        return not collapse_open
