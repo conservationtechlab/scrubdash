@@ -16,22 +16,20 @@ class session:
                  hostname,
                  record_folder,
                  continue_run,
-                 config_file,
+                 configs,
                  dash_queue,
                  filter_classes,
                  notification_sender,
-                 alert_classes,
-                 cooldown_time,
                  timestamp):
         self.HOSTNAME = hostname
         self.RECORD_FOLDER = record_folder
         self.CONTINUE_RUN = continue_run
-        self.CONFIG_FILE = config_file
+        self.configs = configs
         self.FILTER_CLASSES = filter_classes
         self.dash_queue = dash_queue
         self.notification = notification_sender
-        self.ALERT_CLASSES = alert_classes
-        self.COOLDOWN_TIME = cooldown_time
+        self.ALERT_CLASSES = configs['ALERT_CLASSES']
+        self.COOLDOWN_TIME = configs['COOLDOWN_TIME']
 
         # Configure session paths
         log.info(continue_run)
@@ -284,8 +282,7 @@ class session:
             yaml.dump(setting, summary, default_flow_style=False)
 
             # record config settings
-            for key, value in yaml.load(open(self.CONFIG_FILE),
-                                        Loader=yaml.SafeLoader).items():
+            for key, value in self.configs.items():
                 setting = {key: value}
                 yaml.dump(setting, summary, default_flow_style=False)
 

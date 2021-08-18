@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 persistent_filter_classes = None
 
 
-def start_dash(asyncio_queue, dash_ip, dash_port):
+def start_dash(configs, asyncio_queue):
     """
     Starts the dash server and controls which page layout to render
 
@@ -29,6 +29,8 @@ def start_dash(asyncio_queue, dash_ip, dash_port):
     """
     # persistent variables allow dash server to retain image metadata
     # when the browser is closed and reopened
+    DASH_IP = configs['DASH_SERVER_IP']
+    DASH_PORT = configs['DASH_SERVER_PORT']
     global persistent_host_classes
     global persistent_host_images
     global persistent_host_image_logs
@@ -169,7 +171,7 @@ def start_dash(asyncio_queue, dash_ip, dash_port):
         else:
             return history.layout
 
-    app.run_server(host=dash_ip, port=dash_port)
+    app.run_server(host=DASH_IP, port=DASH_PORT)
 
     # don't need to catch KeyboardInterrupt since app.run_server() catches the
     # keyboard interrupt to end the server.

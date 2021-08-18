@@ -45,14 +45,11 @@ class notification:
         carriers that notifications will be sent to
     """
     def __init__(self,
-                 sender,
-                 sender_password,
-                 email_receivers,
-                 sms_receivers):
-        self.SENDER = sender
-        self.SENDER_PASSWORD = sender_password
-        self.EMAIL_RECEIVERS = email_receivers
-        self.SMS_RECEIVERS = sms_receivers
+                 configs):
+        self.SENDER = configs['SENDER']
+        self.SENDER_PASSWORD = configs['SENDER_PASSWORD']
+        self.EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
+        self.SMS_RECEIVERS = configs['SMS_RECEIVERS']
 
     def _get_datetime(self, image_path):
         """
