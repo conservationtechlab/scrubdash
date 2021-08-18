@@ -1,15 +1,17 @@
-import os
+"""This file contains a class for receiving messages from ScrubCam."""
+
 import ast
-import time
-import pickle
-import struct
 import asyncio
 import logging
+import os
+import pickle
+import struct
+import time
 
 import yaml
 
-from scrubdash.asyncio_server.session import session
-from scrubdash.asyncio_server.notification import notification
+from scrubdash.asyncio_server.notification import NotificationSender
+from scrubdash.asyncio_server.session import HostSession
 
 log = logging.getLogger(__name__)
 
@@ -142,16 +144,16 @@ class AsyncioServer:
 
         # Get the rest of the `HostSession` parameters
         timestamp = time.time()
-        notification_sender = notification(self.configs)
+        notification_sender = NotificationSender(self.configs)
 
-        host_session = session(hostname,
-                               self.RECORD_FOLDER,
-                               continue_run,
-                               self.configs,
-                               self.dash_queue,
-                               filter_classes,
-                               notification_sender,
-                               timestamp)
+        host_session = HostSession(hostname,
+                                   self.RECORD_FOLDER,
+                                   continue_run,
+                                   self.configs,
+                                   self.dash_queue,
+                                   filter_classes,
+                                   notification_sender,
+                                   timestamp)
 
         return host_session
 

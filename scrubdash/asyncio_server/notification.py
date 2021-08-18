@@ -1,11 +1,13 @@
+"""This file contains a class for sending email and SMS notifications."""
+
 import logging
-import ssl
 import re
+import ssl
 from email import encoders
 from email.message import EmailMessage
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
 from smtplib import SMTP_SSL, SMTPResponseException
 
 import aiosmtplib
@@ -13,8 +15,7 @@ import aiosmtplib
 log = logging.getLogger(__name__)
 
 HOST = "smtp.gmail.com"
-# https://kb.sandisk.com/app/answers/detail/a_id/17056/~/list-of-mobile-carrier-gateway-addresses
-# https://www.gmass.co/blog/send-text-from-gmail/
+# Exhaustive list of carriers: https://kb.sandisk.com/app/answers/detail/a_id/17056/~/list-of-mobile-carrier-gateway-addresses
 CARRIER_MAP = {
     "verizon": "vtext.com",
     "tmobile": "tmomail.net",
@@ -26,9 +27,9 @@ CARRIER_MAP = {
 }
 
 
-class notification:
+class NotificationSender:
     """
-    A class that represents a notification sender
+    A class that represents a notification sender.
 
     ...
 
@@ -53,7 +54,7 @@ class notification:
 
     def _get_datetime(self, image_path):
         """
-        Parses the date and time from the image path
+        Parse the date and time from the image path.
 
         Parameters
         ----------
@@ -64,13 +65,13 @@ class notification:
         -------
         tuple of (str, str)
             The date in yyyy-mm-dd format and the time in HHhMMmSSs
-            format. An example is (2021-08-06, 02h16m05s)
+            format. An example is (2021-08-06, 02h16m05s).
         """
-        # get filename from path
+        # Get the filename from the image log path
         filename = image_path.split('/')[-1]
-        # remove .xxx.jpeg filename ending
+        # Remove .xxx.jpeg filename ending
         filename = filename[:-9]
-        # split the datetime on 'T'
+        # Split the datetime on 'T'
         datetime = filename.split('T')
 
         date = datetime[0]
@@ -78,17 +79,23 @@ class notification:
 
         return (date, time)
 
-    async def send_sms(self, image_path, notify_classes):
+    async def send_sms(self, image_path, detected_alert_classes):
         """
-        Sends an SMS notification to receivers passed to initializer
+        Send an SMS notification to receivers listed in the `SMS_RECEIVERS`
+        attribute.
 
         Parameters
         ----------
         image_path : str
             The absolute path of the image
-        notify_classes : list of str
-            The list of classes to alert the receiver of. This list will
-            be put in the notification message.
+        detected_alert_classes : list of str
+            The list of classes to alert the receiver of. This list will be
+            put in the notification message.
+
+        Notes
+        -----
+        This was adapted from a post from acamso on April 2, 2021 to a
+        github code thread here: https://gist.github.com/alexle/1294495/39d13f2d4a004a4620c8630d1412738022a4058f
         """
         date, time = self._get_datetime(image_path)
 
@@ -98,13 +105,13 @@ class notification:
 
             to_email = CARRIER_MAP[carrier]
 
-            # build message
+            # Create message.
             message = EmailMessage()
             message["From"] = self.SENDER
             message["To"] = f"{num}@{to_email}"
             message["Subject"] = 'New Scrubdash Image'
             msg = ('At {} {}, we received an image with the following detected'
-                   ' classes: {}').format(date, time, notify_classes)
+                   ' classes: {}').format(date, time, detected_alert_classes)
             message.set_content(msg)
 
             with open(image_path, 'rb') as content_file:
@@ -116,7 +123,7 @@ class notification:
                     filename='{}'.format(image_path.split('/')[-1])
                 )
 
-            # send
+            # Send.
             send_kws = dict(
                             username=self.SENDER,
                             password=self.SENDER_PASSWORD,
@@ -130,55 +137,53 @@ class notification:
                    else "succeeded to send sms to {}".format(num))
             log.info(msg)
 
-    def send_email(self, image_path, notify_classes):
+    def send_email(self, image_path, detected_alert_classes):
         """
-        Sends an email notification to receivers passed to initializer
+        Send an email notification to receivers listed in the
+        `EMAIL_RECEIVERS` attribute.
 
         Parameters
         ----------
         image_path : str
             The absolute path of the image
-        notify_classes : list of str
+        detected_alert_classes : list of str
             The list of classes to alert the receiver of. This list will
             be put in the notification message.
         """
         port = 465  # For SSL
         smtp_server = "smtp.gmail.com"
 
-        # create message
+        # Create message.
         message = MIMEMultipart()
         date, time = self._get_datetime(image_path)
 
-        body = ('At {} {}, we received an image with the following detected'
-                ' classes: {}').format(date, time, notify_classes)
-
         message['From'] = self.SENDER
         message['To'] = ", ".join(self.EMAIL_RECEIVERS)
-
         message['Subject'] = ('Scrubdash: New {} class instance detected'
-                              .format(notify_classes))
-
+                              .format(detected_alert_classes))
+        body = ('At {} {}, we received an image with the following detected'
+                ' classes: {}').format(date, time, detected_alert_classes)
         message.attach(MIMEText(body, 'plain'))
 
         context = ssl.create_default_context()
 
-        # create attachment
+        # Create image attachment.
         with open(image_path, 'rb') as image:
             image_name = image_path.split('/')[-1]
-            # set attachment mime and file name, the image type is jpeg
+            # Set attachment mime and file name, the image type is jpeg.
             mime = MIMEBase('image', 'jpeg', filename=image_name)
-            # add required header data:
+            # Add required header data.
             mime.add_header(
                 'Content-Disposition',
                 'attachment',
                 filename=image_name)
             mime.add_header('X-Attachment-Id', '0')
             mime.add_header('Content-ID', '<0>')
-            # read attachment file content into the MIMEBase object
+            # Read attachment file content into the MIMEBase object.
             mime.set_payload(image.read())
-            # encode with base64
+            # Encode with base64.
             encoders.encode_base64(mime)
-            # add MIMEBase object to MIMEMultipart object
+            # Add MIMEBase object to MIMEMultipart object.
             message.attach(mime)
 
         try:
@@ -186,7 +191,9 @@ class notification:
                 server.login(self.SENDER, self.SENDER_PASSWORD)
                 server.send_message(message)
         except SMTPResponseException:
-            # raise KeyboardInterrupt again so asyncio can catch it
-            # not raising the interrupt only causes SMTP to stop, not the
-            # entire asyncio server.
+            # Raise KeyboardInterrupt again so the asyncio server can catch
+            # it. Not raising the interrupt again causes only SMTP to stop,
+            # not the entire asyncio server. I suspect this is because SMTP
+            # will crash, but the asyncio server will be fine since the
+            # run_forever coroutine was never cancelled by an interrupt.
             raise KeyboardInterrupt

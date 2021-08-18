@@ -1,9 +1,11 @@
-import os
+"""This file contains a class that represents a connected ScrubCam session."""
+
 import csv
-import time
+import logging
+import os
 import pickle
 import struct
-import logging
+import time
 from datetime import datetime
 
 import yaml
@@ -11,7 +13,7 @@ import yaml
 log = logging.getLogger(__name__)
 
 
-class session:
+class HostSession:
     def __init__(self,
                  hostname,
                  record_folder,
@@ -31,36 +33,35 @@ class session:
         self.ALERT_CLASSES = configs['ALERT_CLASSES']
         self.COOLDOWN_TIME = configs['COOLDOWN_TIME']
 
-        # Configure session paths
-        log.info(continue_run)
+        # Configure session paths.
         if continue_run:
             self.cont_run_config()
-            self.initialize_scrubdash()
         else:
             self.new_run_config()
-            self.initialize_scrubdash()
 
-        # Email and SMS control flow variables
+        # Send ScrubCam host metadata to the dash server.
+        self.initialize_scrubdash()
+
+        # Initialize smail and SMS control flow variable.
         self.LAST_ALERT_TIME = None
 
-        # Update heartbeat timestamp
+        # Update heartbeat timestamp.
         self._update_heartbeat_file(time)
 
     def _update_heartbeat_file(self, timestamp):
+        # Write the timestamp to the heartbeat file.
         with open(self.HEARTBEAT_PATH, 'w') as heartbeat_file:
-            # record heartbeat timestamp
             heartbeat = {'HEARTBEAT': timestamp}
             yaml.dump(heartbeat, heartbeat_file, default_flow_style=False)
 
     def initialize_scrubdash(self):
         """
-        Sends an initilization message to scrubdash that contains the
-        hostname, filter class list, and the image log. This gives all
-        the metadata the dash server needs to include the host to the
-        cam page and the grid page.
+        Send an initilization message to the dash server that contains the
+        hostname, filter classes list, and the image log.
+
+        This sends all the metadata the dash server needs to add the host
+        to the cam page and the grid page.
         """
-        # send hostname, filter class list, image log, and timestamp
-        # to dash server
         now = time.time()
         message = {
                 'header': 'INITIALIZE',
@@ -72,11 +73,11 @@ class session:
         self.dash_queue.put(message)
 
     def _write_boxes_file(self, timestamp, lboxes):
-        # writes the lboxes to a comma separated value file (.csv) and
-        # returns the path of the file
-        filename = '{}.csv'.format(timestamp)
-        full_filename = os.path.join(self.SESSION_PATH, filename)
-        with open(full_filename, 'w') as lboxes_csv:
+        # Write the lboxes to a comma separated value file (.csv) and
+        # return the path of the file.
+        csv_filename = '{}.csv'.format(timestamp)
+        csv_path = os.path.join(self.SESSION_PATH, csv_filename)
+        with open(csv_path, 'w') as lboxes_csv:
             csv_writer = csv.writer(lboxes_csv,
                                     delimiter=',',
                                     quotechar='"',
@@ -87,12 +88,12 @@ class session:
                                      *lbox['box']])
                 log.info('Loggged {}'.format(lbox['class_name']))
 
-        return full_filename
+        return csv_path
 
     def _save_image_and_lboxes(self, image, detected_classes, lboxes):
         """
-        Saves the image to disk, writes the lboxes to a csv file, and
-        records image metadata to the image log.
+        Save the image to disk, write the lboxes to a csv file, and
+        record image metadata to the image log.
 
         Parameters
         ----------
@@ -108,44 +109,77 @@ class session:
 
         Returns
         -------
-        str
+        image_path : str
             The saved location of the image
         """
         now = datetime.now()
         unix_timestamp = now.timestamp()
-        dt_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-        timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
-        image_filename = '{}.jpeg'.format(timestamp)
+        datetime_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+        formatted_timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
+        image_filename = '{}.jpeg'.format(formatted_timestamp)
         image_path = os.path.join(self.SESSION_PATH, image_filename)
 
-        # saves image to disk
+        # Save image to disk.
         with open(image_path, 'wb') as image_file:
             image_file.write(image)
 
-        # saves lboxes to a csv file
-        lboxes_path = self._write_boxes_file(timestamp, lboxes)
+        # Save lboxes to a csv file.
+        lboxes_path = self._write_boxes_file(formatted_timestamp, lboxes)
 
-        # update image log that stores all image records
+        # Update image log that stores all image records.
         with open(self.IMAGE_LOG, 'a') as image_log:
             csv_writer = csv.writer(image_log,
                                     delimiter=',',
                                     quotechar='"',
                                     quoting=csv.QUOTE_MINIMAL)
-
             csv_writer.writerow([image_path,
                                  detected_classes,
                                  lboxes_path,
                                  unix_timestamp,
-                                 dt_timestamp])
+                                 datetime_timestamp])
 
         return image_path
 
+    async def _send_notification_if_alert_class_detected(self,
+                                                   image_path,
+                                                   detected_classes,
+                                                   now):
+        # Check if an alert class is detected.
+        alert_set = set(self.ALERT_CLASSES)
+        detected_set = set(detected_classes)
+        detected_alert_classes = list(alert_set.intersection(detected_set))
+
+        # Check if cooldown time has elapsed since most recent alert.
+        if self.LAST_ALERT_TIME is None:
+            # This is the first alert being sent.
+            cooldown_elapsed = True
+        else:
+            # Check if cooldown time has elapsed.
+            time_diff = now - self.LAST_ALERT_TIME
+
+            if time_diff >= self.COOLDOWN_TIME:
+                cooldown_elapsed = True
+            else:
+                cooldown_elapsed = False
+
+        # Send email and SMS notification if alert classes are detected and
+        # cooldown time has elapsed.
+        if len(detected_alert_classes) > 0 and cooldown_elapsed:
+            self.notification.send_email(image_path,
+                                         detected_alert_classes)
+            await self.notification.send_sms(image_path,
+                                             detected_alert_classes)
+            last_alert_time = time.time()
+            self.LAST_ALERT_TIME = last_alert_time
+
     async def handle_image(self, reader, writer):
         """
-        Reads the bytestreams of the lboxes and of the image from
-        ScrubCam and saves them to disk. This method also sends the SMS
-        and email notifications and sends the image to ScrubDash so it
-        can be shown as the most recent image on the main grid.
+        Read the bytestreams of the lboxes and of the image from ScrubCam
+        and save them to disk.
+
+        This method also sends the SMS and email notifications and sends
+        the image to the dash server so it can be shown as the most recent
+        image on the main grid.
 
         Parameters
         ----------
@@ -156,92 +190,83 @@ class session:
             A writer object that provides APIs to write data to the IO
             stream
         """
-        # read size of lboxes struct
+        # Read size of lboxes struct.
         lboxes_struct = await reader.read(struct.calcsize('<L'))
         lboxes_size = struct.unpack('<L', lboxes_struct)[0]
 
-        # read in lboxes bytestream
+        # Read in lboxes bytestream.
         lboxes_bytes = await reader.readexactly(lboxes_size)
         lboxes = pickle.loads(lboxes_bytes)
         log.debug('lboxes received: {}'.format(lboxes))
 
         detected_classes = [lbox['class_name'] for lbox in lboxes]
-        # preserve only the classes in filter_classes
+        # Preserve only the classes in self.FILTER_CLASSES.
         detected_classes = [class_name for class_name in detected_classes
                             if class_name in self.FILTER_CLASSES]
-        # preserve only unique classes and preserve ordering by confidence
-        # descending.
+        # Remove duplicate class occurances and preserve ordering by
+        # confidence descending.
         detected_classes = list(dict.fromkeys(detected_classes))
 
-        # read size of image bytestream
+        # Read size of image bytestream.
         image_struct = await reader.read(struct.calcsize('<L'))
         image_size = struct.unpack('<L', image_struct)[0]
-        # for debugging: print(image_size)
 
-        # read in image bytestream
+        # Read in image bytestream.
         image = await reader.readexactly(image_size)
 
-        # save image to disk and to the csv
-        filename = self._save_image_and_lboxes(image,
-                                               detected_classes,
-                                               lboxes)
+        # Save image to disk and to the csv.
+        image_path = self._save_image_and_lboxes(image,
+                                                 detected_classes,
+                                                 lboxes)
 
-        # get current timestamp
-        timestamp = time.time()
+        # Get current timestamp.
+        now = time.time()
 
-        # send image path and class name to dash server
+        # Send image path and class name to dash server.
         message = {
             'header': 'IMAGE',
             'hostname': self.HOSTNAME,
-            'img_path': filename,
+            'img_path': image_path,
             'labels': detected_classes,
-            'timestamp': timestamp
+            'timestamp': now
         }
         self.dash_queue.put(message)
 
-        # check if an alert class is detected
-        alert_set = set(self.ALERT_CLASSES)
-        detected_set = set(detected_classes)
-        notify_classes = alert_set.intersection(detected_set)
-
-        # check if cooldown time has elapsed since most recent alert
-        if self.LAST_ALERT_TIME is None:
-            # This is the first alert being sent
-            cooldown_elapsed = True
-        else:
-            # get current time and check if cooldown time has elapsed
-            now = time.time()
-            time_diff = now - self.LAST_ALERT_TIME
-
-            if time_diff >= self.COOLDOWN_TIME:
-                cooldown_elapsed = True
-            else:
-                cooldown_elapsed = False
-
-        # send sms and email alert if alert classes are detected and cooldown
-        # time has elapsed
-        if len(notify_classes) > 0 and cooldown_elapsed:
-            self.notification.send_email(filename, list(notify_classes))
-            await self.notification.send_sms(filename, list(notify_classes))
-            last_alert_time = time.time()
-            self.LAST_ALERT_TIME = last_alert_time
-
-        # update heartbeat timestamp
-        self._update_heartbeat_file(timestamp)
+        # Send notification if an alert class is detected.
+        await self._send_notification_if_alert_class_detected(image_path,
+                                                        detected_classes,
+                                                        now)
+        # Update heartbeat timestamp.
+        self._update_heartbeat_file(now)
 
         log.info("Finished processing image")
 
     async def handle_heartbeat(self, reader, writer):
-        # read size of lboxes struct
+        """
+        Read the heartbeat bytestream from ScrubCam and send a 'CONNECTION'
+        message to the dash server.
+
+        This method also updates timestamp in the heartbeat yaml file.
+
+        Parameters
+        ----------
+        reader : asyncio.StreamReader
+            A reader object that provides APIs to read data from the IO
+            stream
+        writer : asyncio.StreamWriter
+            A writer object that provides APIs to write data to the IO
+            stream
+        """
+        # Read size of lboxes struct.
         timestamp_struct = await reader.read(struct.calcsize('<L'))
         timestamp_size = struct.unpack('<L', timestamp_struct)[0]
 
-        # read in timestamp bytestream
+        # Read in timestamp bytestream.
         timestamp_bytes = await reader.readexactly(timestamp_size)
-        # convert str timestamp to int
+        # Convert str timestamp to int.
         timestamp_bytes = int(timestamp_bytes)
 
-        # send hearbeat to dash server
+        # Send hearbeat to dash server.
         message = {
             'header': 'CONNECTION',
             'hostname': self.HOSTNAME,
@@ -249,45 +274,46 @@ class session:
         }
         self.dash_queue.put(message)
 
-        # update heartbeat timestamp
+        # Update heartbeat timestamp.
         self._update_heartbeat_file(timestamp_bytes)
 
     def new_run_config(self):
         """
-        Configures the session object for a new run (new session). The
-        user session folder, image log, and summary file are created
-        within the host folder.
+        Configures the session instance for a new run. A new user session
+        folder, image log, summary file, and heartbeat file are created in
+        the host folder.
         """
         now = datetime.now()
-        timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
-        session_foldername = timestamp
+        formatted_timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
+        session_foldername = formatted_timestamp
         session_path = os.path.join(self.RECORD_FOLDER,
                                     self.HOSTNAME,
                                     session_foldername)
+        # Create session folder.
         os.makedirs(session_path)
 
         self.SESSION_PATH = session_path
 
-        # make summary yaml file
-        summary_filename = '{}_summary.yaml'.format(timestamp)
+        # Make summary yaml file.
+        summary_filename = '{}_summary.yaml'.format(formatted_timestamp)
         self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
 
         with open(self.SUMMARY_PATH, 'a') as summary:
-            # record hostname
+            # Add hostname to summary.
             hostname = {'HOSTNAME': self.HOSTNAME}
             yaml.dump(hostname, summary, default_flow_style=False)
 
-            # record user session
+            # Add session path to summary.
             setting = {'USER_SESSION': self.SESSION_PATH}
             yaml.dump(setting, summary, default_flow_style=False)
 
-            # record config settings
+            # Add config settings to summary.
             for key, value in self.configs.items():
                 setting = {key: value}
                 yaml.dump(setting, summary, default_flow_style=False)
 
-        # make image log csv
-        imagelog_filename = '{}_imagelog.csv'.format(timestamp)
+        # Make image log csv.
+        imagelog_filename = '{}_imagelog.csv'.format(formatted_timestamp)
         self.IMAGE_LOG = os.path.join(self.SESSION_PATH, imagelog_filename)
 
         with open(self.IMAGE_LOG, 'a') as imagelog:
@@ -300,30 +326,30 @@ class session:
             csv_writer.writerow(header)
 
         with open(self.SUMMARY_PATH, 'a') as summary:
-            # record image log
+            # Add image log path to summary.
             setting = {'IMAGE_LOG': self.IMAGE_LOG}
             yaml.dump(setting, summary, default_flow_style=False)
 
-        # add FILTER_CLASSES to summary
+        # Add filter classes to summary.
         with open(self.SUMMARY_PATH, 'a') as summary:
             setting = {"FILTER_CLASSES": self.FILTER_CLASSES}
             yaml.dump(setting, summary, default_flow_style=None)
 
-        # create heartbeat timestamp yaml file
-        heartbeat_filename = '{}_heartbeat.yaml'.format(timestamp)
+        # Create heartbeat timestamp yaml file
+        heartbeat_filename = '{}_heartbeat.yaml'.format(formatted_timestamp)
         self.HEARTBEAT_PATH = os.path.join(self.SESSION_PATH,
                                            heartbeat_filename)
 
         with open(self.SUMMARY_PATH, 'a') as summary:
-            # record hostname
-            hostname = {'HOSTNAME': self.HOSTNAME}
+            # Add heartbeat to summary.
+            hostname = {'HEARTBEAT_PATH': self.HEARTBEAT_PATH}
             yaml.dump(hostname, summary, default_flow_style=False)
 
     def cont_run_config(self):
         """
-        Configures the session object for a continuing run. The most
-        recent user session folder, image log, and summary files are
-        retrieved from the host folder.
+        Configures the session instance for a continuing run. The most
+        recent user session folder, image log, summary file, and heartbeat
+        file are retrieved from the host folder.
         """
         # get most recent host session
         HOST_FOLDER = os.path.join(self.RECORD_FOLDER, self.HOSTNAME)
@@ -335,8 +361,8 @@ class session:
         self.SESSION_PATH = latest_subdir
 
         # get yaml summary file
-        timestamp = latest_subdir.split('/')[-1]
-        summary_filename = '{}_summary.yaml'.format(timestamp)
+        formatted_timestamp = latest_subdir.split('/')[-1]
+        summary_filename = '{}_summary.yaml'.format(formatted_timestamp)
         self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
 
         with open(self.SUMMARY_PATH) as f:
@@ -349,6 +375,4 @@ class session:
         self.IMAGE_LOG = configs['IMAGE_LOG']
 
         # get yaml hearbeat file
-        heartbeat_filename = '{}_heartbeat.yaml'.format(timestamp)
-        self.HEARTBEAT_PATH = os.path.join(self.SESSION_PATH,
-                                           heartbeat_filename)
+        self.HEARTBEAT_PATH = configs['HEARTBEAT_PATH']
