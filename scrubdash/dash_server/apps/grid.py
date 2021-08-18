@@ -17,11 +17,15 @@ layout = dbc.Container(
             html.Div(
                 [
                     html.Div(
-                        html.A("Graphs", href='/graphs')
+                        html.A("Graphs", href='', id='graph-link')
                     ),
                     html.Div(
                         "Waiting to connect to scrubcam...",
                         id='grid-content'),
+                    html.A(
+                        id='grid-back-btn',
+                        children='Go back to scrubcam host page',
+                        href='/')
                 ],
                 id='index-content'
             )
@@ -29,10 +33,25 @@ layout = dbc.Container(
     )
 
 
+# updates graph link to be host specific
+@app.callback(Output('graph-link', 'href'),
+              Input('url', 'pathname'))
+def update_graph_link(pathname):
+    # get hostname
+    hostname = pathname.split('/')[1]
+
+    # create href
+    href = '{}/graphs'.format(hostname)
+
+    return href
+
+
+# TODO: change docstring to reflect changed parameters to host dicts
 # updates grid images when image dictionary changes
 @app.callback(Output('grid-content', 'children'),
-              Input('image-dict', 'data'))
-def update_grid(image_dict):
+              Input('host-images', 'data'),
+              Input('url', 'pathname'))
+def update_grid(host_images, pathname):
     """
     Updates grid images when the image dictionary changes
 
@@ -51,13 +70,20 @@ def update_grid(image_dict):
         classes
     """
     # change nothing if image dictionary is empty
-    if not image_dict:
+    if not host_images:
         return "Waiting to connect to scrubcam..."
+
+    # get hostname
+    hostname = pathname.split('/')[1]
 
     grid = []
     row = []
     col = 0
 
+    log.info(host_images)
+    log.info('hostname: {}'.format(hostname))
+    image_dict = host_images[hostname]
+    log.info('image dict: {}'.format(image_dict))
     # put 3 columns in a row with 1 image per column
     # image base64 reference: https://stackoverflow.com/questions/
     # 3715493/encoding-an-image-file-with-base64
@@ -86,7 +112,7 @@ def update_grid(image_dict):
                                 id=class_name,
                                 src='data:image/png;base64,{}'
                                 .format(base64_image)),
-                            href='/{}'.format(class_name)
+                            href='/{}/{}'.format(hostname, class_name)
                         ),
                         html.Div(class_name.capitalize())
                     ])))

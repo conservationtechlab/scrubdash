@@ -104,9 +104,16 @@ layout = dbc.Container(
                 id='modal',
                 size='lg',
                 is_open=False),
-            dcc.Link(
-                'Go back',
-                href='/'),
+            html.Div(
+                html.A(
+                    id='hist-back-btn',
+                    children='Go back to class page',
+                    href='')),
+            html.Div(
+                html.A(
+                    id='host-back-btn',
+                    children='Go back to host page',
+                    href='/')),
             html.Div(
                 id='pages',
                 children=[
@@ -127,14 +134,24 @@ layout = dbc.Container(
 )
 
 
+@app.callback(Output('hist-back-btn', 'href'),
+              Input('url', 'pathname'))
+def update_history_back_link(pathname):
+    # get hostname
+    hostname = pathname.split('/')[1]
+    href = '/{}'.format(hostname)
+    return href
+
+
+# TODO: change docstring to reflect changed parameters to host dicts
 # Updates the history-class when landing on the history page
 # This triggers the rest of the history callbacks
 # This also retriggers on refresh
 @app.callback(Output('history-class', 'data'),
               Output('image-csv', 'data'),
               Input('url', 'pathname'),
-              State('log-path', 'data'))
-def display_history_page(pathname, log_path):
+              State('host-image-logs', 'data'))
+def display_history_page(pathname, host_logs):
     """
     Initializes the history page by updating the history class and
     image log json dataframe when loading the page and on refresh
@@ -154,14 +171,16 @@ def display_history_page(pathname, log_path):
         A json representation of the transformed dataframe used by the
         histogram and time graph
     """
-    # removes the '/' from the beginning of pathname
-    animal = pathname[1:]
+    # get hostname and image class
+    hostname = pathname.split('/')[1]
+    image_class = pathname.split('/')[2]
 
+    log_path = host_logs[hostname]
     image_csv = pd.read_csv(log_path)
 
     # resets the indices after dropping rows
     filtered = image_csv[image_csv['labels'].str.contains(
-        animal)].reset_index(drop=True)
+        image_class)].reset_index(drop=True)
     # sorts paths in descending order (most recent to least recent)
     filtered.sort_values(ascending=False, by=['path'], inplace=True)
 
@@ -190,8 +209,8 @@ def create_history_header(pathname):
         The page header indicating what class the history page is for
     """
     # removes the '/' from the beginning of pathname
-    animal = pathname[1:]
-    header = '{} Images'.format(animal.capitalize())
+    host_and_class = pathname[1:]
+    header = '{} Images'.format(host_and_class)
 
     return header
 

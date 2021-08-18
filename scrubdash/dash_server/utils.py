@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime
 
 import pandas as pd
 
@@ -75,3 +76,80 @@ def get_base64_image(filename):
         base64_image = base64.b64encode(image_file.read()).decode('ascii')
 
     return base64_image
+
+
+# TODO: rename method to get_total_duration or something
+# source: https://stackoverflow.com/questions/1345827/how-do-i-find-the-time-difference-between-two-datetime-objects-in-python
+# slightly modified from the source to return the total duration in a
+# year, day, hour, minute, second format
+def get_durations(then):
+
+    # Returns a duration as specified by variable interval
+    # Functions, except totalDuration, returns [quotient, remainder]
+    now = datetime.now()
+    duration = now - then  # For build-in functions
+    duration_in_s = duration.total_seconds()
+
+    def years():
+        return divmod(duration_in_s, 31536000)  # Seconds in a year=31536000.
+
+    def days(seconds):
+        return divmod(seconds if seconds is not None else duration_in_s, 86400)
+        # Seconds in a day = 86400
+
+    def hours(seconds):
+        # Seconds in an hour = 3600
+        return divmod(seconds if seconds is not None else duration_in_s, 3600)
+
+    def minutes(seconds):
+        # Seconds in a minute = 60
+        return divmod(seconds if seconds is not None else duration_in_s, 60)
+
+    def seconds(seconds):
+        if seconds is not None:
+            return divmod(seconds, 1)
+        return duration_in_s
+
+    y = years()
+    d = days(y[1])  # Use remainder to calculate next variable
+    h = hours(d[1])
+    m = minutes(h[1])
+    s = seconds(m[1])
+
+    return {
+        'years': int(y[0]),
+        'days': int(d[0]),
+        'hours': int(h[0]),
+        'minutes': int(m[0]),
+        'seconds': int(s[0]),
+    }
+
+
+def check_connection(then):
+    durations = get_durations(then)
+    styles = {'color': 'red', 'whiteSpace': 'pre-wrap'}
+
+    print(durations)
+
+    if durations['years'] > 0:
+        msg = ('DISCONNECTED\nLast online: {} year(s), {} day(s) ago'
+               .format(durations['years'], durations['days']))
+    elif durations['days'] > 0:
+        msg = ('DISCONNECTED\nLast online: {} day(s), {} hours(s) ago'
+               .format(durations['days'], durations['hours']))
+    elif durations['hours'] > 0:
+        msg = ('DISCONNECTED\nLast online: {} hours(s), {} minute(s) ago'
+               .format(durations['hours'], durations['minutes']))
+    elif durations['minutes'] > 0:
+        msg = ('DISCONNECTED\nLast online: {} minute(s), {} second(s) ago'
+               .format(durations['minutes'], durations['seconds']))
+    elif durations['seconds'] > 20:
+        # check for 20 seconds instead of 15 seconds to allow for
+        # a small amount of network latency
+        msg = ('DISCONNECTED\nLast online: {} second(s) ago'
+               .format(durations['seconds']))
+    else:
+        msg = 'CONNECTED'
+        styles['color'] = 'green'
+
+    return (msg, styles)

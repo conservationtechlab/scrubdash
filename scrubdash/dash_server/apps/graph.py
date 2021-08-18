@@ -76,18 +76,18 @@ layout = html.Div([
 ])
 
 
+# TODO: change docstring to reflect changed parameters to host dicts
 # Initializes the dropdown options when entering the graph page.
-# 'filter-classes' must be an Input or else there will be callback problems.
-# Passing 'filter-classes' as a State will result in a None value on the
-# initial call since there is no default 'data' value for 'filter-classes'
+# 'host-classes' must be an Input or else there will be callback problems.
+# Passing 'host-classes' as a State will result in a None value on the
+# initial call since there is no default 'data' value for 'host-classes'
 @app.callback(Output('dropdown', 'options'),
               Output('time-class', 'options'),
               Output('label-count', 'data'),
               Input('url', 'pathname'),
-              Input('filter-classes', 'data'),
-              State('image-dict', 'data'),
-              State('log-path', 'data'))
-def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
+              Input('host-classes', 'data'),
+              State('host-image-logs', 'data'))
+def initialize_graph_page(pathname, host_classes, host_logs):
     """
     Initializes the dropdown options for each graph and the transformed
     dataframe for the histogram and time graph
@@ -98,10 +98,6 @@ def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
         The pathname of the url in window.location
     filter_classes : list of str
         The list of classes the scrubcam filters images for
-    image_dict : dict of { 'class_name' : str }
-        The dictionary that maps the most recent image for each
-        class_name. The image is represented as the absolute path
-        to the image
     log_path : str
         The absolute path of the image log for the current user session
 
@@ -117,6 +113,13 @@ def initialize_graph_page(pathname, filter_classes, image_dict, log_path):
         A json representation of the transformed dataframe used by the
         histogram and time graph
     """
+    # get hostname
+    hostname = pathname.split('/')[1]
+
+    # get scrubcam specific class list and image log
+    filter_classes = host_classes[hostname]
+    log_path = host_logs[hostname]
+
     # create options list
     dropdown_options = [{'label': 'All', 'value': 'All'}]
 

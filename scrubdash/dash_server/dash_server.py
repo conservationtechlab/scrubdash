@@ -2,10 +2,10 @@ import logging
 
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import grid, history, graph
+from scrubdash.dash_server.apps import grid, history, graph, cam
 from scrubdash.dash_server.utils import create_image_dict
 
 log = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 persistent_filter_classes = None
 
 
-def start_dash(asyncio_queue, log_path, filter_classes, dash_ip, dash_port):
+def start_dash(asyncio_queue, dash_ip, dash_port):
     """
     Starts the dash server and controls which page layout to render
 
@@ -22,29 +22,30 @@ def start_dash(asyncio_queue, log_path, filter_classes, dash_ip, dash_port):
     asyncio_queue : multiprocessing.Queue
         The shared queue that allows communication between the asyncio
         server and dash server
-    log_path : str
-        The absolute path of the image log for the current user session
-    filter_classes : list of str
-        The list of classes the scrubcam filters images for
     dash_ip : str
         The IP address the dash server renders the dashboard on
     dash_port : int
         The port number the dash server renders the dashboard on
     """
-    # Necessary for when the actual list for filter_classes is not
-    # available on dash start-up since scrubcam has not connected to
-    # asyncio yet.
-    # However, we want dash to be running anyway so the "waiting to
-    # connect to scurbdash..." page can be shown to the user.
-    global persistent_filter_classes
-    persistent_filter_classes = filter_classes
+    # persistent variables allow dash server to retain image metadata
+    # when the browser is closed and reopened
+    global persistent_host_classes
+    global persistent_host_images
+    global persistent_host_image_logs
+    global persistent_host_timestamps
+
+    persistent_host_classes = {}
+    persistent_host_images = {}
+    persistent_host_image_logs = {}
+    persistent_host_timestamps = {}
 
     app.layout = html.Div(
         [
             dcc.Location(id='url', refresh=False),
-            dcc.Store(id='log-path'),
-            dcc.Store(id='image-dict'),
-            dcc.Store(id='filter-classes'),
+            dcc.Store(id='host-image-logs'),
+            dcc.Store(id='host-images'),
+            dcc.Store(id='host-classes'),
+            dcc.Store(id='host-timestamps'),
             dcc.Interval(
                 id='interval-component',
                 interval=1.5 * 1000,  # in milliseconds
@@ -55,91 +56,91 @@ def start_dash(asyncio_queue, log_path, filter_classes, dash_ip, dash_port):
         ]
     )
 
-    # callback should only be triggered on initial load since the
-    # trigger is hidden and cannot be clicked on
-    @app.callback(Output('log-path', 'data'),
-                  Input('hidden', 'n_clicks'))
-    def get_log_path(n_clicks):
-        """
-        Initializes `log-path` with the log_path parameter from the
-        `start_dash` method. This makes the image log accessible when
-        the dashboard starts up
-
-        Parameters
-        ----------
-        n_clicks : int
-            The number of times the component has been clicked on
-
-        Returns
-        -------
-        str
-            The absolute path of the image log for the current user
-            session
-        """
-        return log_path
-
+    # TODO: add host-timestamps to docstring parameters
     # checks shared queue every 2 seconds to update image dictionary.
     # also checks if filter classes list is passed (occurs only if
     # scrubcam connects after starting scrubdash.)
-    @app.callback(Output('image-dict', 'data'),
-                  Output('filter-classes', 'data'),
-                  Input('interval-component', 'n_intervals'),
-                  State('image-dict', 'data'))
-    def update_image_dict(n_intervals, image_dict):
+    @app.callback(Output('host-image-logs', 'data'),
+                  Output('host-images', 'data'),
+                  Output('host-classes', 'data'),
+                  Output('host-timestamps', 'data'),
+                  Input('interval-component', 'n_intervals'))
+    def update_image_dict(n_intervals):
         """
         Checks the shared queue with the asyncio server every 2 seconds
-        to update the image dictionary if new images are received
+        to either update the a host's image dictionary if new images
+        are received, update a host's image log path, or update a
+        host's filter class list
 
         Parameters
         ----------
         n_intervals : int
             The number of times the interval has passed
-        image_dict : dict of { 'class_name' : str }
-            The dictionary that maps the most recent image for each
-            class_name. The image is represented as the absolute path
-            to the image
 
         Returns
         -------
-        dict of { 'class_name' : str }
-            An updated dictionary that maps the most recent image for
-            each class_name. The image is represented as the absolute
-            path to the image
-        list of str
-            The list of filter classes from scrubcam
+        dict of { 'hostname': str }
+            A dictionary that contains the absolute path to each
+            host's image log
+        dict of { 'hostname': dict of {'class_name': str} }
+            A dictionary that contains the absolute path to most
+            recent image for each class in a host's filter class list
+        dict of { 'hostname': list of str }
+            A dictionary that contains the filter class list each host
         """
-        global persistent_filter_classes
-
-        # reinitialize image_dict if user closes the dashboard and
-        # reopens it during the user session
-        if not image_dict:
-            image_dict = create_image_dict(persistent_filter_classes, log_path)
+        global persistent_host_classes
+        global persistent_host_images
+        global persistent_host_image_logs
+        global persistent_host_timestamps
 
         while not asyncio_queue.empty():
             message = asyncio_queue.get()
 
+            hostname = message['hostname']
             header = message['header']
 
-            if header == 'CLASSES':
-                # initialize persistent filter classes var and create
-                # image_dict
+            if header == 'INITIALIZE':
+                # retrieve class list
                 class_list = message['class_list']
-                persistent_filter_classes = class_list
+                persistent_host_classes[hostname] = class_list
+
+                # get image log path
+                persistent_host_image_logs[hostname] = message['image_log']
+                log_path = persistent_host_image_logs[hostname]
+
+                # create image dictionary
                 image_dict = create_image_dict(class_list, log_path)
+                persistent_host_images[hostname] = image_dict
+
+                # get timestamp
+                persistent_host_timestamps[hostname] = message['timestamp']
+
             # short circuits out if image_dict is empty
-            elif image_dict and header == 'IMAGE':
+            elif header == 'IMAGE':
                 filename = message['img_path']
                 detected_classes = message['labels']
 
                 # filter out extraneous classes
+                host_filter_classes = persistent_host_classes[hostname]
+                image_dict = persistent_host_images[hostname]
                 for class_name in detected_classes:
-                    if class_name in persistent_filter_classes:
+                    if class_name in host_filter_classes:
                         image_dict[class_name] = filename
 
-        # no change is made to image_dict if it is empty and an image
-        # is received
-        # persistent_filter_classes only changes if header == 'CLASSES'
-        return image_dict,  persistent_filter_classes
+                # get timestamp
+                persistent_host_timestamps[hostname] = message['timestamp']
+
+            elif header == 'CONNECTION':
+                persistent_host_timestamps[hostname] = message['timestamp']
+
+        log.info(persistent_host_timestamps)
+
+        # the return value is not a tuple
+        # the return value is four separate outputs, but they are
+        # grouped together with parens to make flake8 happy since
+        # putting all the variables on one line goes over 80 chars
+        return (persistent_host_image_logs, persistent_host_images,
+                persistent_host_classes, persistent_host_timestamps)
 
     # Update the page
     @app.callback(Output('page-content', 'children'),
@@ -158,10 +159,13 @@ def start_dash(asyncio_queue, log_path, filter_classes, dash_ip, dash_port):
         Dash HTML Component
             A page layout written with Dash HTML Components
         """
+        # TODO: change to regex
         if pathname == '/':
-            return grid.layout
-        elif pathname == '/graphs':
+            return cam.layout
+        elif 'graph' in pathname:
             return graph.layout
+        elif pathname.count('/') == 1:
+            return grid.layout
         else:
             return history.layout
 
