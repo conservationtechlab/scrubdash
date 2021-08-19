@@ -62,7 +62,7 @@ def start_dash(configs, asyncio_queue):
                   Output('host-classes', 'data'),
                   Output('host-timestamps', 'data'),
                   Input('interval-component', 'n_intervals'))
-    def update_image_dict(n_intervals):
+    def update_host_dicts(n_intervals):
         """
         Check the shared queue with the asyncio server every 2 seconds
         to either update the a host's image dictionary if new images
