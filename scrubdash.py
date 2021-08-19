@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-import yaml
-import logging
-import argparse
 
+"""
+This module contains the entry point for the CLI script and the PyPI
+console script
+"""
+
+import argparse
+import logging
 from multiprocessing import Process, Queue
-from scrubdash.dash_server.dash_server import start_dash
+
+import yaml
+
 from scrubdash.asyncio_server.asyncio_server import AsyncioServer
+from scrubdash.dash_server.dash_server import start_dash
 
 parser = argparse.ArgumentParser()
 parser.add_argument('config_filename')
