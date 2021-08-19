@@ -65,30 +65,6 @@ class AsyncioServer:
         self.port = configs['ASYNCIO_SERVER_PORT']
         self.RECORD_FOLDER = configs['RECORD_FOLDER']
 
-    async def handle_header(self, reader, writer):
-        """
-        Read the bytestream of the message header from ScrubCam.
-
-        Parameters
-        ----------
-        reader : asyncio.StreamReader
-            A reader object that provides APIs to read data from the IO
-            stream
-        writer : asyncio.StreamWriter
-            A writer object that provides APIs to write data to the IO
-            stream
-
-        Returns
-        -------
-        header : str
-            The message header describing what the contents of the
-            message are
-        """
-        # Get header from socket message.
-        header = await read_and_unserialize_socket_msg(reader)
-
-        return header
-
     async def handle_session_config(self, reader, writer):
         """
         Create a new `HostSession` instance.
@@ -112,7 +88,7 @@ class AsyncioServer:
         host_session : HostSession
             An initialized `HostSession` instance
         """
-        header = await self.handle_header(reader, writer)
+        header = await read_and_unserialize_socket_msg(reader)
 
         # Get most of the `HostSession` parameters from ScrubCam
         while header != 'DONE':
@@ -125,7 +101,7 @@ class AsyncioServer:
             elif header == 'CLASSES':
                 filter_classes = msg
 
-            header = await self.handle_header(reader, writer)
+            header = await read_and_unserialize_socket_msg(reader)
 
         # Get the rest of the `HostSession` parameters
         timestamp = time.time()
@@ -153,7 +129,7 @@ class AsyncioServer:
         # assumes that a 'CONFIG' header will always be the first header
         # sent whenever a ScrubCam connects.
         while True:
-            header = await self.handle_header(reader, writer)
+            header = await read_and_unserialize_socket_msg(reader)
 
             if header == 'CONFIG':
                 host_session = await self.handle_session_config(reader, writer)
