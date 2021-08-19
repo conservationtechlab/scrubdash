@@ -1,11 +1,8 @@
 """This file contains a class for receiving messages from ScrubCam."""
 
-import ast
 import asyncio
 import logging
 import os
-import pickle
-import struct
 import time
 
 import yaml
@@ -13,7 +10,8 @@ import yaml
 from scrubdash.asyncio_server.notification import NotificationSender
 from scrubdash.asyncio_server.session import HostSession
 from scrubdash.asyncio_server.utils import (get_most_recent_subdirectory,
-                                            get_subdirectories)
+                                            get_subdirectories,
+                                            read_and_unserialize_socket_msg)
 
 log = logging.getLogger(__name__)
 
@@ -86,13 +84,8 @@ class AsyncioServer:
             The message header describing what the contents of the
             message are
         """
-        # Read size of header bytestream
-        header_struct = await reader.read(struct.calcsize('<L'))
-        header_size = struct.unpack('<L', header_struct)[0]
-
-        # Read in header bytestream
-        header_bytes = await reader.readexactly(header_size)
-        header = header_bytes.decode('utf-8')
+        # Get header from socket message.
+        header = await read_and_unserialize_socket_msg(reader)
 
         return header
 
@@ -123,22 +116,12 @@ class AsyncioServer:
 
         # Get most of the `HostSession` parameters from ScrubCam
         while header != 'DONE':
-            # Read size of incoming bytestream
-            bytes_struct = await reader.read(struct.calcsize('<L'))
-            bytes_size = struct.unpack('<L', bytes_struct)[0]
-
-            # Read incoming bytestream message
-            msg_bytes = await reader.readexactly(bytes_size)
-
-            if header != 'CLASSES':
-                msg = msg_bytes.decode('utf-8')
-            else:
-                msg = pickle.loads(msg_bytes)
+            msg = await read_and_unserialize_socket_msg(reader)
 
             if header == 'HOSTNAME':
                 hostname = msg
             elif header == 'CONTINUE_RUN':
-                continue_run = ast.literal_eval(msg)
+                continue_run = msg
             elif header == 'CLASSES':
                 filter_classes = msg
 
@@ -171,7 +154,7 @@ class AsyncioServer:
         # sent whenever a ScrubCam connects.
         while True:
             header = await self.handle_header(reader, writer)
-            log.info('recv header')
+
             if header == 'CONFIG':
                 host_session = await self.handle_session_config(reader, writer)
             elif header == 'IMAGE':

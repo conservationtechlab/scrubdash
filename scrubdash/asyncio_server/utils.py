@@ -1,4 +1,6 @@
 import os
+import pickle
+import struct
 
 
 def get_subdirectories(parent_directory):
@@ -13,3 +15,15 @@ def get_most_recent_subdirectory(directory_list):
     latest_subdir = max(directory_list, key=os.path.getmtime)
 
     return latest_subdir
+
+
+async def read_and_unserialize_socket_msg(reader):
+    # Read size of msg bytestream
+    msg_struct = await reader.read(struct.calcsize('<L'))
+    msg_size = struct.unpack('<L', msg_struct)[0]
+
+    # Read in msg bytestream
+    msg_bytes = await reader.readexactly(msg_size)
+    msg = pickle.loads(msg_bytes)
+
+    return msg

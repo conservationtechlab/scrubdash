@@ -3,7 +3,6 @@
 import csv
 import logging
 import os
-import pickle
 import struct
 import time
 from datetime import datetime
@@ -11,7 +10,8 @@ from datetime import datetime
 import yaml
 
 from scrubdash.asyncio_server.utils import (get_most_recent_subdirectory,
-                                            get_subdirectories)
+                                            get_subdirectories,
+                                            read_and_unserialize_socket_msg)
 
 log = logging.getLogger(__name__)
 
@@ -193,13 +193,7 @@ class HostSession:
             A writer object that provides APIs to write data to the IO
             stream
         """
-        # Read size of lboxes struct.
-        lboxes_struct = await reader.read(struct.calcsize('<L'))
-        lboxes_size = struct.unpack('<L', lboxes_struct)[0]
-
-        # Read in lboxes bytestream.
-        lboxes_bytes = await reader.readexactly(lboxes_size)
-        lboxes = pickle.loads(lboxes_bytes)
+        lboxes = await read_and_unserialize_socket_msg(reader)
 
         detected_classes = [lbox['class_name'] for lbox in lboxes]
         # Preserve only the classes in self.FILTER_CLASSES.
@@ -236,8 +230,8 @@ class HostSession:
 
         # Send notification if an alert class is detected.
         await self._send_notification_if_alert_class_detected(image_path,
-                                                        detected_classes,
-                                                        now)
+                                                              detected_classes,
+                                                              now)
         # Update heartbeat timestamp.
         self._update_heartbeat_file(now)
 
@@ -259,25 +253,19 @@ class HostSession:
             A writer object that provides APIs to write data to the IO
             stream
         """
-        # Read size of lboxes struct.
-        timestamp_struct = await reader.read(struct.calcsize('<L'))
-        timestamp_size = struct.unpack('<L', timestamp_struct)[0]
-
-        # Read in timestamp bytestream.
-        timestamp_bytes = await reader.readexactly(timestamp_size)
-        # Convert str timestamp to int.
-        timestamp_bytes = int(timestamp_bytes)
+        # Get timestamp.
+        timestamp = await read_and_unserialize_socket_msg(reader)
 
         # Send hearbeat to dash server.
         message = {
             'header': 'CONNECTION',
             'hostname': self.HOSTNAME,
-            'timestamp': timestamp_bytes
+            'timestamp': timestamp
         }
         self.dash_queue.put(message)
 
         # Update heartbeat timestamp.
-        self._update_heartbeat_file(timestamp_bytes)
+        self._update_heartbeat_file(timestamp)
 
     def new_run_config(self):
         """
