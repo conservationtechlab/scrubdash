@@ -9,7 +9,8 @@ from datetime import datetime
 
 import yaml
 
-from scrubdash.asyncio_server.utils import (get_most_recent_subdirectory,
+from scrubdash.asyncio_server.utils import (append_to_yaml,
+                                            get_most_recent_subdirectory,
                                             get_subdirectories,
                                             read_and_unserialize_socket_msg)
 
@@ -269,9 +270,12 @@ class HostSession:
 
     def new_run_config(self):
         """
-        Configures the session instance for a new run. A new user session
+        Configure the session instance for a new run. A new user session
         folder, image log, summary file, and heartbeat file are created in
         the host folder.
+
+        This method also creates the record folder and all intermediate
+        directories at runtime if has not been created yet.
         """
         now = datetime.now()
         formatted_timestamp = now.strftime('%Y-%m-%dT%Hh%Mm%Ss.%f')[:-3]
@@ -283,24 +287,6 @@ class HostSession:
         os.makedirs(session_path)
 
         self.SESSION_PATH = session_path
-
-        # Make summary yaml file.
-        summary_filename = '{}_summary.yaml'.format(formatted_timestamp)
-        self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
-
-        with open(self.SUMMARY_PATH, 'a') as summary:
-            # Add hostname to summary.
-            hostname = {'HOSTNAME': self.HOSTNAME}
-            yaml.dump(hostname, summary, default_flow_style=False)
-
-            # Add session path to summary.
-            setting = {'USER_SESSION': self.SESSION_PATH}
-            yaml.dump(setting, summary, default_flow_style=False)
-
-            # Add config settings to summary.
-            for key, value in self.configs.items():
-                setting = {key: value}
-                yaml.dump(setting, summary, default_flow_style=False)
 
         # Make image log csv.
         imagelog_filename = '{}_imagelog.csv'.format(formatted_timestamp)
@@ -315,29 +301,42 @@ class HostSession:
                                     quoting=csv.QUOTE_MINIMAL)
             csv_writer.writerow(header)
 
-        with open(self.SUMMARY_PATH, 'a') as summary:
-            # Add image log path to summary.
-            setting = {'IMAGE_LOG': self.IMAGE_LOG}
-            yaml.dump(setting, summary, default_flow_style=False)
-
-        # Add filter classes to summary.
-        with open(self.SUMMARY_PATH, 'a') as summary:
-            setting = {"FILTER_CLASSES": self.FILTER_CLASSES}
-            yaml.dump(setting, summary, default_flow_style=None)
-
         # Create heartbeat timestamp yaml file
         heartbeat_filename = '{}_heartbeat.yaml'.format(formatted_timestamp)
         self.HEARTBEAT_PATH = os.path.join(self.SESSION_PATH,
                                            heartbeat_filename)
 
+        # Make summary yaml file.
+        summary_filename = '{}_summary.yaml'.format(formatted_timestamp)
+        self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
+
+        # Add metadata to summary file.
         with open(self.SUMMARY_PATH, 'a') as summary:
+            # Add hostname to summary.
+            append_to_yaml('HOSTNAME', self.HOSTNAME, summary)
+            # Add session path to summary.
+            append_to_yaml('USER_SESSION', self.SESSION_PATH, summary)
+            # Add filter classes to summary.
+            append_to_yaml('FILTER_CLASSES',
+                           self.FILTER_CLASSES,
+                           summary,
+                           None)
+            # Add image log  to summary.
+            append_to_yaml('IMAGE_LOG', self.IMAGE_LOG, summary)
             # Add heartbeat to summary.
-            hostname = {'HEARTBEAT_PATH': self.HEARTBEAT_PATH}
-            yaml.dump(hostname, summary, default_flow_style=False)
+            append_to_yaml('HEARTBEAT_PATH', self.HEARTBEAT_PATH, summary)
+            # Add config settings to summary.
+            for key, value in self.configs.items():
+                # value_is_list is for formatting the metadata in the yaml
+                if isinstance(value, list):
+                    value_is_list = None
+                else:
+                    value_is_list = False
+                append_to_yaml(key, value, summary, value_is_list)
 
     def cont_run_config(self):
         """
-        Configures the session instance for a continuing run. The most
+        Configure the session instance for a continuing run. The most
         recent user session folder, image log, summary file, and heartbeat
         file are retrieved from the host folder.
         """

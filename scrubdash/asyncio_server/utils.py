@@ -2,6 +2,8 @@ import os
 import pickle
 import struct
 
+import yaml
+
 
 def get_subdirectories(parent_directory):
     all_subdirs = [os.path.join(parent_directory, d)
@@ -27,3 +29,8 @@ async def read_and_unserialize_socket_msg(reader):
     msg = pickle.loads(msg_bytes)
 
     return msg
+
+
+def append_to_yaml(key, value, yaml_file, flow_style=False):
+    pair = {key: value}
+    yaml.dump(pair, yaml_file, default_flow_style=flow_style)
