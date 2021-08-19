@@ -19,8 +19,20 @@ log = logging.getLogger(__name__)
 class AsyncioServer:
     """
     Asynchronous server that receives messages from ScrubCam and
-    persistently saves data (images and lboxes) to disk.
+    configures the environments (folders and files) used to persistently
+    save ScrubCam session metadata.
 
+    This class is used in conjunction with the HostSession class. Each
+    HostSession instance represents an active connection to a ScrubCam and
+    the HostSession instance is responsible for persistently saving data
+    (images and lboxes) received from ScrubCam to the disk. Since a
+    HostSession class is unable to read socket messages from ScrubCam, the
+    AsyncioServer class is responsible for reading socket messages and
+    relaying the messages to the correct HostSession instance.
+
+    The AsyncioServer can also send messages to the dash server, but only
+    does so to send configuration data like a HostSession's hostname,
+    filter class list, and image log.
     ...
 
     Attributes

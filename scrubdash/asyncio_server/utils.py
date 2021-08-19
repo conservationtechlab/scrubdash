@@ -1,3 +1,5 @@
+"""This file contains utility methods used by the asyncio_server package."""
+
 import os
 import pickle
 import struct
@@ -82,7 +84,7 @@ def append_to_yaml(key, value, yaml_file, flow_style=False):
     ----------
     key : str
         The key for the key-value pair data.
-    value : str or int or list or dict
+    value : str or int or float or list or dict
         The value for the key-value pair data.
     yaml_file : file object
         An opened yaml file

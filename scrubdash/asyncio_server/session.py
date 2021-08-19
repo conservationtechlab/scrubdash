@@ -18,6 +18,61 @@ log = logging.getLogger(__name__)
 
 
 class HostSession:
+    """
+    A class that represents a connected session between a ScrubCam and an
+    AsyncioServer instance.
+
+    This class is to be used in conjunction with the AsyncioServer class.
+    Since the HostSession class cannot read socket meessages from
+    ScrubCam, an AsyncioServer instance is used as an intermediary to
+    relay ScrubCam messages to a HostSession instance.
+
+    The HostSession class is responsible for persistently saving data and
+    metadata (images, lboxes) to a user session folder. This class is
+    responsible for writing the summary file and updating the image log
+    and heartbeat files.
+
+    The HostSession class is responsible for sending in time messages to
+    the dash server, such as received images and the heartbeat received
+    from a ScrubCam.
+    ...
+
+    Attributes
+    ----------
+    HOSTNAME : str
+        The hostname of the ScrubCam
+    RECORD_FOLDER : str
+        The folder location that each ScrubCam's metadata is saved to
+    CONTINUE_RUN : bool
+        A flag used to signify a new user session
+    configs : dict
+        The dictionary of configuration settings obtained from loading a
+        yaml config file
+    FILTER_CLASSES
+        The list of classes ScrubCam takes an image of
+    dash_queue : multiprocessing.Queue
+        The shared queue that allows for communication between the
+        asyncio server and dash server
+    IMAGE_LOG : str
+        The absolute path of the image log
+    SUMMARY_PATH : str
+        The absolute path of the summary yaml file
+    SESSION_PATH : str
+        The absolute path of the session folder
+    HEARTBEAT_PATH : str
+        The absolute path of the heartbeat yaml file
+    notification_sender : NotificationSender
+        An instance of the NotificationSender class that sends email
+        and SMS notifications
+    ALERT_CLASSES : list of str
+        The list of classes to send a notification for if observed in a
+        received image
+    COOLDOWN_TIME : int
+        The number of seconds that must elapse before another
+        notification can be sent
+    LAST_ALERT_TIME : float or int
+        The unix time for the most recently sent notification
+    """
     def __init__(self,
                  hostname,
                  record_folder,
@@ -27,13 +82,36 @@ class HostSession:
                  filter_classes,
                  notification_sender,
                  timestamp):
+        """
+        Parameters
+        ----------
+        hostname : str
+            The hostname of the ScrubCam
+        record_folder : str
+            The folder location that each ScrubCam's metadata is saved to
+        continue_run : bool
+            A flag used to signify a new user session
+        configs : dict
+            The dictionary of configuration settings obtained from loading a
+            yaml config file
+        dash_queue : multiprocessing.Queue
+            The shared queue that allows for communication between the
+            asyncio server and dash server
+        filter_classes : list of str
+            The list of classes ScrubCam takes an image of
+        notification_sender : NotificationSender
+            An instance of the NotificationSender class that sends email
+            and SMS notifications
+        timestamp : float
+            The Unix time the HostSession is instantiated at
+        """
         self.HOSTNAME = hostname
         self.RECORD_FOLDER = record_folder
         self.CONTINUE_RUN = continue_run
         self.configs = configs
         self.FILTER_CLASSES = filter_classes
         self.dash_queue = dash_queue
-        self.notification = notification_sender
+        self.notification_sender = notification_sender
         self.ALERT_CLASSES = configs['ALERT_CLASSES']
         self.COOLDOWN_TIME = configs['COOLDOWN_TIME']
 
@@ -148,6 +226,26 @@ class HostSession:
                                                          image_path,
                                                          detected_classes,
                                                          now):
+        """
+        Send an email and SMS notification if one of the classes detected
+        in the image is in `ALERT_CLASSES`.
+
+        This method is *not* referentially transparent. This method has an
+        internal cooldown and will only send the email and SMS
+        notification once every 60 seconds. The next email and SMS
+        notification may only be sent once the internal cooldown elapses.
+        If this method is called before the cooldown elapses, a no-op is
+        performed.
+
+        Parameters
+        ----------
+        image_path : str
+            The absolute path to the image
+        detected_classes : list of str
+            The list of classes detected in the image
+        now : int
+            A timestamp indicating when the image was received
+        """
         # Check if an alert class is detected.
         alert_set = set(self.ALERT_CLASSES)
         detected_set = set(detected_classes)
@@ -169,10 +267,10 @@ class HostSession:
         # Send email and SMS notification if alert classes are detected and
         # cooldown time has elapsed.
         if len(detected_alert_classes) > 0 and cooldown_elapsed:
-            self.notification.send_email(image_path,
-                                         detected_alert_classes)
-            await self.notification.send_sms(image_path,
-                                             detected_alert_classes)
+            self.notification_sender.send_email(image_path,
+                                                detected_alert_classes)
+            await self.notification_sender.send_sms(image_path,
+                                                    detected_alert_classes)
             last_alert_time = time.time()
             self.LAST_ALERT_TIME = last_alert_time
 
