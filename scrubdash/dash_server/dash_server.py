@@ -1,4 +1,5 @@
 import logging
+import re
 
 import dash_core_components as dcc
 import dash_html_components as html
@@ -15,20 +16,18 @@ persistent_filter_classes = None
 
 def start_dash(configs, asyncio_queue):
     """
-    Starts the dash server and controls which page layout to render
+    Start the dash server and control which page layout to render.
 
     Parameters
     ----------
+    configs : str
+        The dictionary of configuration settings obtained from loading a
+        yaml config file
     asyncio_queue : multiprocessing.Queue
         The shared queue that allows communication between the asyncio
-        server and dash server
-    dash_ip : str
-        The IP address the dash server renders the dashboard on
-    dash_port : int
-        The port number the dash server renders the dashboard on
     """
-    # persistent variables allow dash server to retain image metadata
-    # when the browser is closed and reopened
+    # Persistent variables allow the dash server to retain image
+    # metadata when the browser is closed and/or reopened.
     DASH_IP = configs['DASH_SERVER_IP']
     DASH_PORT = configs['DASH_SERVER_PORT']
     global persistent_host_classes
@@ -58,10 +57,6 @@ def start_dash(configs, asyncio_queue):
         ]
     )
 
-    # TODO: add host-timestamps to docstring parameters
-    # checks shared queue every 2 seconds to update image dictionary.
-    # also checks if filter classes list is passed (occurs only if
-    # scrubcam connects after starting scrubdash.)
     @app.callback(Output('host-image-logs', 'data'),
                   Output('host-images', 'data'),
                   Output('host-classes', 'data'),
@@ -69,10 +64,10 @@ def start_dash(configs, asyncio_queue):
                   Input('interval-component', 'n_intervals'))
     def update_image_dict(n_intervals):
         """
-        Checks the shared queue with the asyncio server every 2 seconds
+        Check the shared queue with the asyncio server every 2 seconds
         to either update the a host's image dictionary if new images
         are received, update a host's image log path, or update a
-        host's filter class list
+        host's filter class list.
 
         Parameters
         ----------
@@ -81,14 +76,18 @@ def start_dash(configs, asyncio_queue):
 
         Returns
         -------
-        dict of { 'hostname': str }
+        persistent_host_image_logs : dict of { 'hostname': str }
             A dictionary that contains the absolute path to each
             host's image log
-        dict of { 'hostname': dict of {'class_name': str} }
+        persistent_host_images : dict of
+                                 { 'hostname': dict of {'class_name': str} }
             A dictionary that contains the absolute path to most
             recent image for each class in a host's filter class list
-        dict of { 'hostname': list of str }
+        persistent_host_classes : dict of { 'hostname': list of str }
             A dictionary that contains the filter class list each host
+        persistent_host_timestamps : dict of { 'hostname': float }
+            A dictionary that contains the timestamp of the most recent
+            heartbeat or message from each host
         """
         global persistent_host_classes
         global persistent_host_images
@@ -101,55 +100,52 @@ def start_dash(configs, asyncio_queue):
             hostname = message['hostname']
             header = message['header']
 
+            # There is no header check for 'CONNECTION' since a
+            # 'CONNECTION' message only includes the heartbeat timestamp.
+            # However, an 'INITIALIZE' and 'IMAGE' message also contain
+            # the heartbeat timestamp, so obtaining the timestamp is not
+            # conditional.  Thus, getting the timestamp is at the end of
+            # the while loop and will be executed no matter the header
+            # value.
             if header == 'INITIALIZE':
-                # retrieve class list
+                # Retrieve class list.
                 class_list = message['class_list']
                 persistent_host_classes[hostname] = class_list
 
-                # get image log path
+                # Get image log path.
                 persistent_host_image_logs[hostname] = message['image_log']
                 log_path = persistent_host_image_logs[hostname]
 
-                # create image dictionary
+                # Create image dictionary.
                 image_dict = create_image_dict(class_list, log_path)
                 persistent_host_images[hostname] = image_dict
 
-                # get timestamp
-                persistent_host_timestamps[hostname] = message['timestamp']
-
-            # short circuits out if image_dict is empty
             elif header == 'IMAGE':
                 filename = message['img_path']
                 detected_classes = message['labels']
 
-                # filter out extraneous classes
+                # Update most recent image for relevant classes.
                 host_filter_classes = persistent_host_classes[hostname]
                 image_dict = persistent_host_images[hostname]
                 for class_name in detected_classes:
                     if class_name in host_filter_classes:
                         image_dict[class_name] = filename
 
-                # get timestamp
-                persistent_host_timestamps[hostname] = message['timestamp']
+            # Get timestamp.
+            persistent_host_timestamps[hostname] = message['timestamp']
 
-            elif header == 'CONNECTION':
-                persistent_host_timestamps[hostname] = message['timestamp']
-
-        log.info(persistent_host_timestamps)
-
-        # the return value is not a tuple
-        # the return value is four separate outputs, but they are
-        # grouped together with parens to make flake8 happy since
-        # putting all the variables on one line goes over 80 chars
+        # The return value is not a tuple.  The return value is four
+        # separate outputs, but they are grouped together with parens to
+        # make flake8 happy since putting all the variables on one line
+        # goes over 80 chars.
         return (persistent_host_image_logs, persistent_host_images,
                 persistent_host_classes, persistent_host_timestamps)
 
-    # Update the page
     @app.callback(Output('page-content', 'children'),
                   Input('url', 'pathname'))
     def display_page(pathname):
         """
-        Updates the page contents when the pathname of the url changes
+        Update the page content when the pathname of the url changes.
 
         Parameters
         ----------
@@ -161,19 +157,21 @@ def start_dash(configs, asyncio_queue):
         Dash HTML Component
             A page layout written with Dash HTML Components
         """
-        # TODO: change to regex
         if pathname == '/':
             return cam.layout
-        elif 'graph' in pathname:
+        # Matches with '/[hostname]/graph'
+        elif re.match('/[a-zA-Z0-9_]+/graph', pathname):
             return graph.layout
-        elif pathname.count('/') == 1:
-            return grid.layout
-        else:
+        # Matches with '/[hostname]/[class]'
+        elif re.match('/[a-zA-Z0-9_]*/[a-zA-Z0-9_]+', pathname):
             return history.layout
+        # Matches with '/[hostname]'
+        else:
+            return grid.layout
 
     app.run_server(host=DASH_IP, port=DASH_PORT)
 
-    # don't need to catch KeyboardInterrupt since app.run_server() catches the
-    # keyboard interrupt to end the server.
-    # getting to log.info() means that the server has successfully closed.
+    # Don't need to catch KeyboardInterrupt since app.run_server catches
+    # the keyboard interrupt to end the server.  Executing the following
+    # log.info() means that the server has successfully closed.
     log.info('Successfully shut down dash server.')
