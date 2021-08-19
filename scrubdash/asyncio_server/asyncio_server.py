@@ -12,6 +12,8 @@ import yaml
 
 from scrubdash.asyncio_server.notification import NotificationSender
 from scrubdash.asyncio_server.session import HostSession
+from scrubdash.asyncio_server.utils import (get_most_recent_subdirectory,
+                                            get_subdirectories)
 
 log = logging.getLogger(__name__)
 
@@ -187,17 +189,13 @@ class AsyncioServer:
         folder is defined by the folder with the most recent modified time.
         """
         # Get the absolute path for each ScrubCam host folder
-        host_folders = [os.path.join(self.RECORD_FOLDER, d)
-                        for d in os.listdir(self.RECORD_FOLDER)
-                        if os.path.isdir(os.path.join(self.RECORD_FOLDER, d))]
+        host_folders = get_subdirectories(self.RECORD_FOLDER)
 
         for host_folder in host_folders:
             # Get the absolute paths of all session folders for a host
-            session_folders = [os.path.join(host_folder, d)
-                               for d in os.listdir(host_folder)
-                               if os.path.isdir(os.path.join(host_folder, d))]
+            session_folders = get_subdirectories(host_folder)
             # Get the absolute path for the most recent session folder
-            most_recent_session = max(session_folders, key=os.path.getmtime)
+            most_recent_session = get_most_recent_subdirectory(session_folders)
 
             # Get the yaml summary file path
             timestamp = most_recent_session.split('/')[-1]

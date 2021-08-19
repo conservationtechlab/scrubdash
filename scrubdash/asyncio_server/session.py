@@ -10,6 +10,9 @@ from datetime import datetime
 
 import yaml
 
+from scrubdash.asyncio_server.utils import (get_most_recent_subdirectory,
+                                            get_subdirectories)
+
 log = logging.getLogger(__name__)
 
 
@@ -141,9 +144,9 @@ class HostSession:
         return image_path
 
     async def _send_notification_if_alert_class_detected(self,
-                                                   image_path,
-                                                   detected_classes,
-                                                   now):
+                                                         image_path,
+                                                         detected_classes,
+                                                         now):
         # Check if an alert class is detected.
         alert_set = set(self.ALERT_CLASSES)
         detected_set = set(detected_classes)
@@ -197,7 +200,6 @@ class HostSession:
         # Read in lboxes bytestream.
         lboxes_bytes = await reader.readexactly(lboxes_size)
         lboxes = pickle.loads(lboxes_bytes)
-        log.debug('lboxes received: {}'.format(lboxes))
 
         detected_classes = [lbox['class_name'] for lbox in lboxes]
         # Preserve only the classes in self.FILTER_CLASSES.
@@ -353,11 +355,9 @@ class HostSession:
         """
         # get most recent host session
         HOST_FOLDER = os.path.join(self.RECORD_FOLDER, self.HOSTNAME)
-        all_subdirs = [os.path.join(HOST_FOLDER, d)
-                       for d in os.listdir(HOST_FOLDER)
-                       if os.path.isdir(os.path.join(HOST_FOLDER, d))]
+        all_subdirs = get_subdirectories(HOST_FOLDER)
 
-        latest_subdir = max(all_subdirs, key=os.path.getmtime)
+        latest_subdir = get_most_recent_subdirectory(all_subdirs)
         self.SESSION_PATH = latest_subdir
 
         # get yaml summary file
