@@ -1,5 +1,6 @@
 import ast
 import csv
+import math
 import base64
 import logging
 from io import BytesIO
@@ -23,7 +24,7 @@ layout = dbc.Container(
         [
             html.H1(id='history-header'),
             html.Div(id='page-output-container'),
-            dcc.Store(id='page-index', data=0),
+            dcc.Store(id='page-index', data=1),
             dcc.Store(id='image-csv'),
             dcc.Store(id='history-class'),
             dcc.Store(id='slider-val', data=.6),
@@ -122,6 +123,21 @@ layout = dbc.Container(
                         id='prev-btn',
                         n_clicks=0,
                         style={'display': 'none'}),
+                    html.Div(
+                        children=[
+                            'Page ',
+                            dcc.Input(id='page-input',
+                                      type='number',
+                                      value=1,
+                                      min=1),
+                            '/',
+                            html.P(id='total-pages',
+                                   style={'display': 'inline'}),
+                            html.P(id='page-error',
+                                   style={'display': 'inline',
+                                          'color': 'red'})
+                        ]
+                    ),
                     html.Button(
                         'Next',
                         id='next-btn',
@@ -149,6 +165,8 @@ def update_history_back_link(pathname):
 # This also retriggers on refresh
 @app.callback(Output('history-class', 'data'),
               Output('image-csv', 'data'),
+              Output('total-pages', 'children'),
+              Output('page-input', 'max'),
               Input('url', 'pathname'),
               State('host-image-logs', 'data'))
 def display_history_page(pathname, host_logs):
@@ -187,7 +205,10 @@ def display_history_page(pathname, host_logs):
     # converts the pandas dataframe to json to be stored in dcc.Store()
     json_result = filtered.to_json(orient='index')
 
-    return pathname, json_result
+    # counts how many pages are in the pandas dataframe
+    total_pages = math.ceil(len(filtered)/9)
+
+    return pathname, json_result, total_pages, total_pages
 
 
 # Updates the page header when landing on the history page
@@ -265,7 +286,7 @@ def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
     # gets a list of animal images and lboxes
     image_list = filtered_csv[['path', 'lboxes', 'datetime']].values.tolist()
 
-    image_index = (page * 9) + index
+    image_index = ((page - 1) * 9) + index
     image_count = len(image_list)
 
     if image_index < image_count:
@@ -274,7 +295,7 @@ def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
         image_path = image[0]
         source_img = Image.open(image_path).convert('RGB')
         header = image[2]
-        display = {'display': 'block'}
+        display = {'display': 'inline-block'}
     else:
         # image index is not in dataframe (it's out of bounds)
         # return a white frame and hide the display
@@ -315,13 +336,17 @@ def slider_value(values):
     return 'You have selected a confidence interval of: {}'.format(values)
 
 
-# updates page index on button click
+# updates page index on button click or page input
 @app.callback(Output('page-index', 'data'),
+              Output('page-input', 'value'),
+              Output('page-error', 'children'),
               Input('prev-btn', 'n_clicks'),
               Input('next-btn', 'n_clicks'),
+              Input('page-input', 'value'),
               State('page-index', 'data'),
+              State('total-pages', 'children'),
               prevent_initial_call=True)
-def next_page(prev_btn, next_btn, page):
+def next_page(prev_btn, next_btn, page_input, page, total_pages):
     """
     Updates the page index when clicking the `Next` or `Back` buttons
 
@@ -345,12 +370,23 @@ def next_page(prev_btn, next_btn, page):
     # gets the id of the component that triggered the callback
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
+    log.info(f'next page callback trigger: {button_id}')
+
     if button_id == 'next-btn':
         page += 1
-    else:
+    elif button_id == 'prev-btn':
         page -= 1
+    else:
+        if page_input is None:
+            return (dash.no_update,
+                    dash.no_update,
+                    'Error: The page must be between 1-{}'.format(total_pages))
+        elif page_input == page:
+            return dash.no_update, dash.no_update, ''
+        else:
+            page = page_input
 
-    return page
+    return page, page, ''
 
 
 # determines which buttons to render
@@ -369,7 +405,7 @@ def render_buttons(page, json_df):
     Parameters
     ---------
     page : int
-        The current 3x3 grid page. Pages are indexed at 0
+        The current 3x3 grid page. Pages are indexed at 1
     json_df
         A json representation of the transformed dataframe used by the
         histogram and time graph
@@ -388,7 +424,7 @@ def render_buttons(page, json_df):
     image_count = len(image_csv)
 
     # largest index of images currently shown
-    current_max_image_index = (page + 1) * 9
+    current_max_image_index = page * 9
 
     # checks to see if there are more images to show
     if image_count >= current_max_image_index:
@@ -403,11 +439,14 @@ def render_buttons(page, json_df):
         render_prev = False
 
     if render_prev and render_next:
-        render_results = ({'display': 'block'}, {'display': 'block'})
+        render_results = ({'display': 'inline-block', 'float': 'left'},
+                          {'display': 'inline-block', 'float': 'right'})
     elif render_prev:
-        render_results = ({'display': 'block'}, {'display': 'none'})
+        render_results = ({'display': 'inline-block', 'float': 'left'},
+                          {'display': 'none'})
     elif render_next:
-        render_results = ({'display': 'none'}, {'display': 'block'})
+        render_results = ({'display': 'none'},
+                          {'display': 'inline-block', 'float': 'right'})
     else:
         render_results = ({'display': 'none'}, {'display': 'none'})
 
