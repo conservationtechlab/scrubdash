@@ -6,7 +6,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import grid, history, graph, cam
+from scrubdash.dash_server.apps import cam, graph, grid, history
 from scrubdash.dash_server.utils import create_image_dict
 
 log = logging.getLogger(__name__)
