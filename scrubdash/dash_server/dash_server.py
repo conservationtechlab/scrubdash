@@ -1,3 +1,8 @@
+"""
+This module contains high level callbacks that read messages from the
+asyncio server and handles which pages to show based on the url.
+"""
+
 import logging
 import re
 
@@ -6,12 +11,10 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import cam, graph, grid, history
+from scrubdash.dash_server.apps import hosts, graphs, grid, history
 from scrubdash.dash_server.utils import create_image_dict
 
 log = logging.getLogger(__name__)
-
-persistent_filter_classes = None
 
 
 def start_dash(configs, asyncio_queue):
@@ -158,10 +161,10 @@ def start_dash(configs, asyncio_queue):
             A page layout written with Dash HTML Components
         """
         if pathname == '/':
-            return cam.layout
+            return hosts.layout
         # Matches with '/[hostname]/graph'
-        elif re.match('/[a-zA-Z0-9_]+/graph', pathname):
-            return graph.layout
+        elif re.match('/[a-zA-Z0-9_]+/graphs', pathname):
+            return graphs.layout
         # Matches with '/[hostname]/[class]'
         elif re.match('/[a-zA-Z0-9_]*/[a-zA-Z0-9_]+', pathname):
             return history.layout

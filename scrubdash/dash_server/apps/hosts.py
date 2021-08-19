@@ -1,3 +1,5 @@
+"""This module contains callbacks for the ScrubCam host page."""
+
 import logging
 from datetime import datetime
 
@@ -13,21 +15,39 @@ log = logging.getLogger(__name__)
 layout = dbc.Container(
         [
             html.Div(
-                id='cam-content'
+                id='host-grid'
             )
         ]
     )
 
 
-# TODO: change docstring to reflect changed parameters to host dicts
-# updates cam links when cam image dictionary changes
-@app.callback(Output('cam-content', 'children'),
+@app.callback(Output('host-grid', 'children'),
               Input('host-timestamps', 'data'))
 def update_cams(host_timestamps):
-    # change nothing if image dictionary is empty
+    """
+    Update which ScrubCam hosts to show and update what their connection
+    status is.
+
+    This callback is triggered when the host timestamps dictionary changes.
+
+    Parameters
+    ----------
+    host_timestamps : float
+        The timestamp of the most recent heartbeat or message from the
+        ScrubCam host
+
+    Returns
+    -------
+    grid : Dash HTML Component
+        A page layout written with Dash HTML Components that shows all the
+        ScrubCam hosts that have connected to the current dashboard
+        session and whether they are still connected or not.
+    """
     if not host_timestamps:
+        # No ScrubCam has connected yet.
         return "Waiting to connect to scrubcam..."
 
+    # Create the grid.
     grid = []
     row = []
     col = 0
@@ -56,8 +76,8 @@ def update_cams(host_timestamps):
             grid.append(dbc.Row(row))
             row = []
 
-    # if we didn't have a multiple of 3 images, the last row never
-    # got appended to grid. So we need to append it now
+    # If we didn't have a multiple of 3 hosts, the last row never got
+    # appended to grid, so we need to append it now.
     if col != 0:
         grid.append(dbc.Row(row))
 
