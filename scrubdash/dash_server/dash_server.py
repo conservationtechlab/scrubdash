@@ -81,7 +81,7 @@ def start_dash(configs, asyncio_queue):
         -------
         persistent_host_image_logs : dict of { 'hostname': str }
             A dictionary that contains the absolute path to each
-            host's image log
+            host's session image log
         persistent_host_images : dict of
                                  { 'hostname': dict of {'class_name': str} }
             A dictionary that contains the absolute path to most

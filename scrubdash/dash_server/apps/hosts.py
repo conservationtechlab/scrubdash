@@ -1,4 +1,4 @@
-"""This module contains callbacks for the ScrubCam host page."""
+"""This module contains the layout and callbacks for the ScrubCam host page."""
 
 import logging
 from datetime import datetime
@@ -60,15 +60,21 @@ def update_cams(host_timestamps):
             dbc.Col(
                 html.Div(
                     [
+                        # Link to a host's filter class grid page.
                         html.A(
                             html.Div(hostname),
                             href='/{}'.format(hostname)
                         ),
+                        # The connected/disconnected message.
                         html.Div(
                             connection_msg,
                             style=text_color
                         )
-                    ])))
+                    ]
+                )
+            )
+        )
+
         col += 1
 
         if col == 3:
