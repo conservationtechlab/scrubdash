@@ -97,7 +97,7 @@ layout = html.Div(
                 ),
                 html.Div(
                     # The actual time histogram.
-                    dcc.Graph(id='time-graph'),
+                    dcc.Graph(id='time-histogram'),
                 )
             ]
         )
@@ -356,7 +356,7 @@ def _update_time_histogram_x_axes(fig, selected_class, selected_span,
     return fig
 
 
-@app.callback(Output('time-graph', 'figure'),
+@app.callback(Output('time-histogram', 'figure'),
               Input('time-class', 'value'),
               Input('time-span', 'value'),
               Input('time-interval', 'value'),
