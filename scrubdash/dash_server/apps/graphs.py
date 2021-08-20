@@ -104,6 +104,28 @@ layout = html.Div(
     ]
 )
 
+no_results_fig = {
+    "layout": {
+        "xaxis": {
+            "visible": False
+        },
+        "yaxis": {
+            "visible": False
+        },
+        "annotations": [
+            {
+                "text": "No matching data found",
+                "xref": "paper",
+                "yref": "paper",
+                "showarrow": False,
+                "font": {
+                    "size": 28
+                }
+            }
+        ]
+    }
+}
+
 
 # host-classes must be an Input or else there will be callback problems.
 # Passing 'host-classes' as a State will result in a None value on the
@@ -204,10 +226,16 @@ def update_histogram(selected_value, json_df):
     else:
         # Filter out rows whose label is different from the selected value.
         filtered_df = df[df['label'] == (selected_value)]
-        fig = px.histogram(filtered_df,
-                           x='label',
-                           title='Count of {} class recorded in the image log'
-                                 .format(selected_value))
+
+        # No results found for selected class.
+        if len(filtered_df) == 0:
+            fig = no_results_fig
+        # Results exist for the selected class.
+        else:
+            fig = px.histogram(filtered_df,
+                               x='label',
+                               title=('Count of {} class recorded in the '
+                                      'image log'.format(selected_value)))
 
     return fig
 
@@ -313,27 +341,7 @@ def _update_time_histogram_x_axes(fig, selected_class, selected_span,
 
     # No results found for selected span.
     if len(filtered_df) == 0:
-        fig = {
-            "layout": {
-                "xaxis": {
-                    "visible": False
-                },
-                "yaxis": {
-                    "visible": False
-                },
-                "annotations": [
-                    {
-                        "text": "No matching data found",
-                        "xref": "paper",
-                        "yref": "paper",
-                        "showarrow": False,
-                        "font": {
-                            "size": 28
-                        }
-                    }
-                ]
-            }
-        }
+        fig = no_results_fig
     # Results exist in the selected span.
     else:
         epoch_formatted = epoch.strftime('%Y-%m-%d %H:%M:%S')
