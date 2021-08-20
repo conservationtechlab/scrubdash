@@ -75,7 +75,7 @@ def update_grid(host_images, pathname):
 
     Parameters
     ----------
-    host-images : dict of { 'hostname': str }
+    host_images : dict of { 'hostname': str }
         A dictionary that contains the absolute path to each
         host's session image log
 
@@ -119,12 +119,11 @@ def update_grid(host_images, pathname):
         # Reduce the image size so it renders faster.
         source_img = source_img.resize((round(1920/8), round(1080/8)))
 
-        # Create temporary IO buffer to store the resized image.
+        # Create a temporary buffer to get image binary.
         buffer = BytesIO()
         source_img.save(buffer, format='JPEG')
-        # Get the bytes of the resized image
+        # Get the bytes of the resized image.
         img_data = buffer.getvalue()
-
         base64_image = base64.b64encode(img_data).decode('ascii')
 
         row.append(
