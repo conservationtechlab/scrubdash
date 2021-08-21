@@ -83,9 +83,33 @@ layout = dbc.Container(
                                     dcc.RangeSlider(
                                         id='confidence-slider',
                                         min=0,
-                                        max=1,
-                                        step=0.05,
-                                        value=[0, .6]
+                                        max=100,
+                                        step=0.5,
+                                        marks={
+                                            0: '0%',
+                                            5: '5%',
+                                            10: '10%',
+                                            15: '15%',
+                                            20: '20%',
+                                            25: '25%',
+                                            30: '30%',
+                                            35: '35%',
+                                            40: '40%',
+                                            45: '45%',
+                                            50: '50%',
+                                            55: '55%',
+                                            60: '60%',
+                                            65: '65%',
+                                            70: '70%',
+                                            75: '75%',
+                                            80: '80%',
+                                            85: '85%',
+                                            90: '90%',
+                                            95: '95%',
+                                            100: '100%'
+                                        },
+                                        value=[0, 60],
+                                        tooltip={'always_visible': True}
                                     ),
                                     html.Div(id='slider-output-container'),
                                 ]
@@ -638,7 +662,7 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, font_color,
                 # The modal window is closed so do nothing.  This
                 # condition happens when the user clicks outside the modal
                 # window to close the component.  Closing the modal window
-                # resets the slider values back to [0, 0.6] in the
+                # resets the slider values back to [0, 60] in the
                 # reset_slider callback.  We just return the modal_open
                 # value back to keep it closed.
                 return modal_open, '', ''
@@ -686,7 +710,8 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, font_color,
 
         for lbox in reader:
             class_name = lbox[0]
-            confidence = float(lbox[1])
+            # Convert decimal into percent.
+            confidence = float((lbox[1])) * 100
 
             if confidence >= confidence_min and confidence <= confidence_max:
                 upper_left_x = int(lbox[2])
@@ -708,8 +733,9 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, font_color,
                              'Roboto/Roboto-Medium.ttf')
                 font = ImageFont.truetype(font_path, 48)
 
+                # Truncate confidence to 3 deciaml places.
                 draw.text((upper_left_corner),
-                          '{}, {}'.format(class_name, confidence),
+                          '{}, {}'.format(class_name, '%.3f' % (confidence)),
                           fill=font_color,
                           font=font)
 
@@ -733,7 +759,7 @@ def toggle_modal(img_clicks, close_btn, selected_confidence, font_color,
               prevent_initial_call=True)
 def reset_slider(modal_open, selected_confidence):
     """
-    Reset the confidence slider range value to [0, 0.6] after closing the
+    Reset the confidence slider range value to [0, 60] after closing the
     modal component.
 
     Parameters
@@ -750,7 +776,7 @@ def reset_slider(modal_open, selected_confidence):
     """
     # The modal window is closed so reset the slider values.
     if not modal_open:
-        return [0, 0.6]
+        return [0, 60]
 
     # The modal window is open so return the current slider values.
     return selected_confidence
