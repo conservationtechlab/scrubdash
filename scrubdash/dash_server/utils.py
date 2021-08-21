@@ -1,14 +1,14 @@
+"""This file contains utility methods used by the dash_server package."""
+
 import ast
-import base64
 from datetime import datetime
 
 import pandas as pd
 
 
-# function to update image dictionary
 def create_image_dict(class_list, image_log):
     """
-    Updates the image dictionary used by the dash server
+    Create a ScrubCam host's image dictionary on connection.
 
     Parameters
     ----------
@@ -19,74 +19,74 @@ def create_image_dict(class_list, image_log):
 
     Returns
     -------
-    dict of { 'class_name' : str }
+    image_dict : dict of { 'class_name' : str }
         An updated dictionary that maps the most recent image for each
         each class_name. The image is represented as the absolute path
         to the image
     """
-    # create empty image dictionary
-    image_dict = {}
-
-    if not class_list:
-        return image_dict
-
-    # populate the image dictionary
-    # initialize image path to most recent entry in image_log.csv
     df = pd.read_csv(image_log)
 
+    # Create empty image dictionary.
+    image_dict = {}
+
+    # Populate the image dictionary by initializing the each class' image
+    # path its most recent entry in the image log.
     for classification in class_list:
-        # resets the indices after dropping rows
-        filtered = df[df['labels'].str.contains(
-            classification)].reset_index(drop=True)
-        # sorts paths in descending order (most recent to least recent)
+        # Drop rows that do not contain the history class and reset the
+        # indices for sorting.
+        filtered = (df[df['labels'].str.contains(classification)]
+                    .reset_index(drop=True))
+        # Sorts paths in descending order (most recent to least recent).
         filtered.sort_values(ascending=False, by=['path'], inplace=True)
 
-        # at least one image exists for this classification
+        # At least one image exists for this class.
         if len(filtered.index) > 0:
-            # get most recent image (the first row since sorted by
-            # desc order)
+            # Get the most recent image (the first row since the df is
+            # sorted by desc order).
             image_dict[classification] = filtered.iloc[0].values[0]
-        # no image exists for this classification
+        # No image exists for this class.
         else:
             image_dict[classification] = None
 
     return image_dict
 
 
-# returns base64 encoding of image
-def get_base64_image(filename):
+def get_time_difference(then):
     """
-    Decodes a bytes-like image file into an ASCII string to be used as
-    an HTML img source
+    Calculate the time difference between the input and the current time.
 
     Parameters
     ----------
-    filename : str
-        The absolute path of the image file
+    then : datetime time object
+        The datetime of the time to calculate the difference from
 
     Returns
     -------
-    str
-        An ASCII decoding of the image bytes
+    dict of {
+                'years': int,
+                'days': int,
+                'hours': int,
+                'minutes': int,
+                'seconds': int,
+            }
+        A dictionary containing the number of years, days, hours, minutes,
+        and seconds that have elapsed between the input and the current
+        time. The days, hours, minutes, and seconds are calculated as
+        remainders from the immediate larger time interval. For example,
+        the return would be something like 1 hour, 0 minutes, 0 seconds to
+        denote that one hour has passed between the input and the current
+        time. The dictionary does *not* return something like 1 hour, 60
+        minutes, 3600 seconds (the interpretation that the dictionary
+        contains the years, days, hours, etc representation of the time
+        difference).
+
+    Notes
+    -----
+    This method is adapted from the `getDuration` method provided in a
+    post answered and edited from Sabito 錆兎 and Attaque on November 9,
+    2017 and Febrary 15, 2021 to a stackoverflow thread here:
+    https://stackoverflow.com/questions/1345827/how-do-i-find-the-time-difference-between-two-datetime-objects-in-python.
     """
-    base64_image = None
-    if filename is None:
-        return ""
-
-    with open(filename, 'rb') as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('ascii')
-
-    return base64_image
-
-
-# TODO: rename method to get_total_duration or something
-# source: https://stackoverflow.com/questions/1345827/how-do-i-find-the-time-difference-between-two-datetime-objects-in-python
-# slightly modified from the source to return the total duration in a
-# year, day, hour, minute, second format
-def get_durations(then):
-
-    # Returns a duration as specified by variable interval
-    # Functions, except totalDuration, returns [quotient, remainder]
     now = datetime.now()
     duration = now - then  # For build-in functions
     duration_in_s = duration.total_seconds()
@@ -127,28 +127,41 @@ def get_durations(then):
 
 
 def check_connection(then):
-    durations = get_durations(then)
+    """
+    Check if a ScrubCam host is still connected to the asyncio server by
+    checking the time difference between the input and the current time.
+
+    Parameters
+    ----------
+    then : datetime time object
+        The datetime of the time to calculate the difference from
+
+    Returns
+    -------
+    tuple of str, CSS style dictionary
+        A tuple that contains the connection status of the ScrubCam host
+        and a CSS style style dictionary to format the status
+    """
+    time_diff = get_time_difference(then)
     styles = {'color': 'red', 'whiteSpace': 'pre-wrap'}
 
-    print(durations)
-
-    if durations['years'] > 0:
+    if time_diff['years'] > 0:
         msg = ('DISCONNECTED\nLast online: {} year(s), {} day(s) ago'
-               .format(durations['years'], durations['days']))
-    elif durations['days'] > 0:
+               .format(time_diff['years'], time_diff['days']))
+    elif time_diff['days'] > 0:
         msg = ('DISCONNECTED\nLast online: {} day(s), {} hours(s) ago'
-               .format(durations['days'], durations['hours']))
-    elif durations['hours'] > 0:
+               .format(time_diff['days'], time_diff['hours']))
+    elif time_diff['hours'] > 0:
         msg = ('DISCONNECTED\nLast online: {} hours(s), {} minute(s) ago'
-               .format(durations['hours'], durations['minutes']))
-    elif durations['minutes'] > 0:
+               .format(time_diff['hours'], time_diff['minutes']))
+    elif time_diff['minutes'] > 0:
         msg = ('DISCONNECTED\nLast online: {} minute(s), {} second(s) ago'
-               .format(durations['minutes'], durations['seconds']))
-    elif durations['seconds'] > 20:
-        # check for 20 seconds instead of 15 seconds to allow for
-        # a small amount of network latency
+               .format(time_diff['minutes'], time_diff['seconds']))
+    elif time_diff['seconds'] > 20:
+        # Check for 20 seconds instead of 15 seconds to allow for
+        # a small amount of network latency.
         msg = ('DISCONNECTED\nLast online: {} second(s) ago'
-               .format(durations['seconds']))
+               .format(time_diff['seconds']))
     else:
         msg = 'CONNECTED'
         styles['color'] = 'green'
