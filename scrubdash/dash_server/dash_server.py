@@ -12,7 +12,7 @@ from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
 from scrubdash.dash_server.apps import hosts, graphs, grid, history
-from scrubdash.dash_server.utils import create_image_dict
+from scrubdash.dash_server.images import create_image_dict
 
 log = logging.getLogger(__name__)
 

@@ -11,7 +11,7 @@ import plotly.express as px
 from dash.dependencies import Input, Output, State
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.utils import transform_graphs_dataframe
+from scrubdash.dash_server.dataframe import transform_graphs_dataframe
 
 log = logging.getLogger(__name__)
 

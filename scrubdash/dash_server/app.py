@@ -1,4 +1,4 @@
-"""This module instantiates the dash app used to render the dashboard"""
+"""This module instantiates the dash app used to render the dashboard."""
 
 import dash
 import dash_bootstrap_components as dbc

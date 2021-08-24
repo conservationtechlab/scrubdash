@@ -8,7 +8,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.utils import check_connection
+from scrubdash.dash_server.networking import check_connection
 
 log = logging.getLogger(__name__)
 
