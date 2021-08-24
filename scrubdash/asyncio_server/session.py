@@ -9,10 +9,10 @@ from datetime import datetime
 
 import yaml
 
-from scrubdash.asyncio_server.utils import (append_to_yaml,
-                                            get_most_recent_subdirectory,
-                                            get_subdirectories,
-                                            read_and_unserialize_socket_msg)
+from scrubdash.asyncio_server.filesystem import (append_to_yaml,
+                                                 get_most_recent_subdirectory,
+                                                 get_subdirectories)
+from scrubdash.asyncio_server.networking import read_and_unserialize_socket_msg
 
 log = logging.getLogger(__name__)
 
@@ -425,7 +425,7 @@ class HostSession:
             append_to_yaml('HEARTBEAT_PATH', self.HEARTBEAT_PATH, summary)
             # Add config settings to summary.
             for key, value in self.configs.items():
-                # value_is_list is for formatting the metadata in the yaml
+                # value_is_list is for formatting the metadata in the yaml.
                 if isinstance(value, list):
                     value_is_list = None
                 else:
@@ -438,14 +438,14 @@ class HostSession:
         recent user session folder, image log, summary file, and heartbeat
         file are retrieved from the host folder.
         """
-        # get most recent host session
+        # Get the most recent host session.
         HOST_FOLDER = os.path.join(self.RECORD_FOLDER, self.HOSTNAME)
         all_subdirs = get_subdirectories(HOST_FOLDER)
 
         latest_subdir = get_most_recent_subdirectory(all_subdirs)
         self.SESSION_PATH = latest_subdir
 
-        # get yaml summary file
+        # Get the yaml summary file.
         formatted_timestamp = latest_subdir.split('/')[-1]
         summary_filename = '{}_summary.yaml'.format(formatted_timestamp)
         self.SUMMARY_PATH = os.path.join(self.SESSION_PATH, summary_filename)
@@ -453,11 +453,11 @@ class HostSession:
         with open(self.SUMMARY_PATH) as f:
             configs = yaml.load(f, Loader=yaml.SafeLoader)
 
-        # get filter classes from summary file
+        # Get filter classes from the summary file.
         self.FILTER_CLASSES = configs['FILTER_CLASSES']
 
-        # get the image_log filename from summary file
+        # Get the image_log filename from summary file.
         self.IMAGE_LOG = configs['IMAGE_LOG']
 
-        # get yaml hearbeat file
+        # Get the yaml hearbeat file.
         self.HEARTBEAT_PATH = configs['HEARTBEAT_PATH']

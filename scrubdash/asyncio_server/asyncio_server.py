@@ -7,11 +7,11 @@ import time
 
 import yaml
 
+from scrubdash.asyncio_server.filesystem import (get_most_recent_subdirectory,
+                                                 get_subdirectories)
+from scrubdash.asyncio_server.networking import read_and_unserialize_socket_msg
 from scrubdash.asyncio_server.notification import NotificationSender
 from scrubdash.asyncio_server.session import HostSession
-from scrubdash.asyncio_server.utils import (get_most_recent_subdirectory,
-                                            get_subdirectories,
-                                            read_and_unserialize_socket_msg)
 
 log = logging.getLogger(__name__)
 
