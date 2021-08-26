@@ -21,22 +21,18 @@ class HostSession:
     """
     A class that represents a connected session between a ScrubCam and an
     AsyncioServer instance.
-
     This class is to be used in conjunction with the AsyncioServer class.
     Since the HostSession class cannot read socket meessages from
     ScrubCam, an AsyncioServer instance is used as an intermediary to
     relay ScrubCam messages to a HostSession instance.
-
     The HostSession class is responsible for persistently saving data and
     metadata (images, lboxes) to a user session folder. This class is
     responsible for writing the summary file and updating the image log
     and heartbeat files.
-
     The HostSession class is responsible for sending in time messages to
     the dash server, such as received images and the heartbeat received
     from a ScrubCam.
     ...
-
     Attributes
     ----------
     HOSTNAME : str
@@ -140,7 +136,6 @@ class HostSession:
         """
         Send an initilization message to the dash server that contains the
         hostname, filter classes list, and the image log.
-
         This sends all the metadata the dash server needs to add the host
         to the cam page and the grid page.
         """
@@ -176,7 +171,6 @@ class HostSession:
         """
         Save the image to disk, write the lboxes to a csv file, and
         record image metadata to the image log.
-
         Parameters
         ----------
         image : bytes
@@ -188,7 +182,6 @@ class HostSession:
                                    'box' : list of int,
                                    'class_name' : str }
             The list of lboxes for each object identified in the image
-
         Returns
         -------
         image_path : str
@@ -229,14 +222,12 @@ class HostSession:
         """
         Send an email and SMS notification if one of the classes detected
         in the image is in `ALERT_CLASSES`.
-
         This method is *not* referentially transparent. This method has an
         internal cooldown and will only send the email and SMS
         notification once every 60 seconds. The next email and SMS
         notification may only be sent once the internal cooldown elapses.
         If this method is called before the cooldown elapses, a no-op is
         performed.
-
         Parameters
         ----------
         image_path : str
@@ -267,9 +258,11 @@ class HostSession:
         # Send email and SMS notification if alert classes are detected and
         # cooldown time has elapsed.
         if len(detected_alert_classes) > 0 and cooldown_elapsed:
-            self.notification_sender.send_email(image_path,
+            self.notification_sender.send_email(self.HOSTNAME,
+                                                image_path,
                                                 detected_alert_classes)
-            await self.notification_sender.send_sms(image_path,
+            await self.notification_sender.send_sms(self.HOSTNAME,
+                                                    image_path,
                                                     detected_alert_classes)
             last_alert_time = time.time()
             self.LAST_ALERT_TIME = last_alert_time
@@ -278,11 +271,9 @@ class HostSession:
         """
         Read the bytestreams of the lboxes and of the image from ScrubCam
         and save them to disk.
-
         This method also sends the SMS and email notifications and sends
         the image to the dash server so it can be shown as the most recent
         image on the main grid.
-
         Parameters
         ----------
         reader : asyncio.StreamReader
@@ -340,9 +331,7 @@ class HostSession:
         """
         Read the heartbeat bytestream from ScrubCam and send a 'CONNECTION'
         message to the dash server.
-
         This method also updates timestamp in the heartbeat yaml file.
-
         Parameters
         ----------
         reader : asyncio.StreamReader
@@ -371,7 +360,6 @@ class HostSession:
         Configure the session instance for a new run. A new user session
         folder, image log, summary file, and heartbeat file are created in
         the host folder.
-
         This method also creates the record folder and all intermediate
         directories at runtime if has not been created yet.
         """

@@ -30,9 +30,7 @@ CARRIER_MAP = {
 class NotificationSender:
     """
     A class that represents a notification sender.
-
     ...
-
     Attributes
     ----------
     SENDER : str
@@ -55,12 +53,10 @@ class NotificationSender:
     def _get_datetime(self, image_path):
         """
         Parse the date and time from the image path.
-
         Parameters
         ----------
         image_path : str
             The absolute path of the image
-
         Returns
         -------
         tuple of (str, str)
@@ -79,19 +75,19 @@ class NotificationSender:
 
         return (date, time)
 
-    async def send_sms(self, image_path, detected_alert_classes):
+    async def send_sms(self, hostname, image_path, detected_alert_classes):
         """
         Send an SMS notification to receivers listed in the `SMS_RECEIVERS`
         attribute.
-
         Parameters
         ----------
+        hostname: str
+            The hostname of the ScrubCam that took the image
         image_path : str
             The absolute path of the image
         detected_alert_classes : list of str
             The list of classes to alert the receiver of. This list will be
             put in the notification message.
-
         Notes
         -----
         This was adapted from a post from acamso on April 2, 2021 to a
@@ -109,9 +105,10 @@ class NotificationSender:
             message = EmailMessage()
             message["From"] = self.SENDER
             message["To"] = f"{num}@{to_email}"
-            message["Subject"] = 'New Scrubdash Image'
-            msg = ('At {} {}, we received an image with the following detected'
-                   ' classes: {}').format(date, time, detected_alert_classes)
+            message["Subject"] = 'New Scrubdash Image from {}'.format(hostname)
+            msg = ('At {} {}, we received an image from {} with the following'
+                   ' detected classes: {}'
+                   .format(date, time, hostname, detected_alert_classes))
             message.set_content(msg)
 
             with open(image_path, 'rb') as content_file:
@@ -137,13 +134,14 @@ class NotificationSender:
                    else "succeeded to send sms to {}".format(num))
             log.info(msg)
 
-    def send_email(self, image_path, detected_alert_classes):
+    def send_email(self, hostname, image_path, detected_alert_classes):
         """
         Send an email notification to receivers listed in the
         `EMAIL_RECEIVERS` attribute.
-
         Parameters
         ----------
+        hostname: str
+            The hostname of the ScrubCam that took the image
         image_path : str
             The absolute path of the image
         detected_alert_classes : list of str
@@ -159,10 +157,11 @@ class NotificationSender:
 
         message['From'] = self.SENDER
         message['To'] = ", ".join(self.EMAIL_RECEIVERS)
-        message['Subject'] = ('Scrubdash: New {} class instance detected'
-                              .format(detected_alert_classes))
-        body = ('At {} {}, we received an image with the following detected'
-                ' classes: {}').format(date, time, detected_alert_classes)
+        message['Subject'] = ('Scrubdash ({}): New {} class instance detected'
+                              .format(hostname, detected_alert_classes))
+        body = ('At {} {}, we received an image from {} with the following '
+                'detected classes: {}'
+                .format(date, time, hostname, detected_alert_classes))
         message.attach(MIMEText(body, 'plain'))
 
         context = ssl.create_default_context()
