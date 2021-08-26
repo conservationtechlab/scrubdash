@@ -24,6 +24,7 @@ setuptools.setup(
     name="scrubdash",
     description=DESC,
     long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     license="MIT",
     version=find_version(read('scrubdash/__init__.py')),
     author=AUTHOR,
@@ -50,6 +51,9 @@ setuptools.setup(
         'Topic :: Scientific/Engineering',
     ],
     python_requires=">=3.7",
-    entry_points={'console_scripts': ["scrubdash=scrubdash.__main__:main"]},
+    entry_points={
+        'console_scripts': ["scrubdash=scrubdash.__main__:main",
+                            "create-config=scrubdash.create_config:main"]
+    },
     include_package_data=True
 )
