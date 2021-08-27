@@ -46,14 +46,15 @@ layout = html.Div(
                     [
                         dcc.Store(id='label-count'),
                         dcc.Dropdown(
-                            id='dropdown',
-                            value='All'
+                            id='agg-dropdown',
+                            value=['All'],
+                            multi=True,
                         )
                     ]
                 ),
                 html.Div(
                     # The actual histogram.
-                    dcc.Graph(id='histogram')
+                    dcc.Graph(id='agg-histogram')
                 )
             ]
         ),
@@ -130,7 +131,7 @@ no_results_fig = {
 # host-classes must be an Input or else there will be callback problems.
 # Passing 'host-classes' as a State will result in a None value on the
 # initial call since there is no default 'data' value for host-classes.
-@app.callback(Output('dropdown', 'options'),
+@app.callback(Output('agg-dropdown', 'options'),
               Output('time-class', 'options'),
               Output('label-count', 'data'),
               Input('url', 'pathname'),
@@ -192,10 +193,10 @@ def initialize_graphs_page(pathname, host_classes, host_image_logs):
     return dropdown_options, dropdown_options, json_result
 
 
-@app.callback(Output('histogram', 'figure'),
-              Input('dropdown', 'value'),
+@app.callback(Output('agg-histogram', 'figure'),
+              Input('agg-dropdown', 'value'),
               Input('label-count', 'data'))
-def update_histogram(selected_value, json_df):
+def update_agg_histogram(selected_values, json_df):
     """
     Update the class shown in the histogram.
 
@@ -204,8 +205,8 @@ def update_histogram(selected_value, json_df):
 
     Parameters
     ----------
-    selected_value : str
-        The class selected in the histogram dropdown
+    selected_values : list of str
+        The list of classes selected in the histogram dropdown
     json_df
         A json representation of the transformed dataframe used by the
         histogram and time graph
@@ -218,24 +219,43 @@ def update_histogram(selected_value, json_df):
     # Convert the label-count data from a json to a pandas dataframe.
     df = pd.read_json(json_df, orient='index')
 
-    if selected_value == 'All':
+    if 'All' in selected_values:
         fig = px.histogram(df,
                            x='label',
                            title=('Count of all classes recorded in the '
                                   'image log'))
+        # Center the title.
+        fig.update_layout(title_x=0.5)
     else:
         # Filter out rows whose label is different from the selected value.
-        filtered_df = df[df['label'] == (selected_value)]
+        filtered_df = df[df['label'].isin(selected_values)]
 
         # No results found for selected class.
         if len(filtered_df) == 0:
             fig = no_results_fig
         # Results exist for the selected class.
         else:
+            # Formatting the title.
+            classes = ', '.join(selected_values)
+            if len(selected_values) == 1:
+                title = ('Count of the {} class recorded in the image log'
+                         .format(classes))
+            else:
+                title = 'Count of the '
+                i = 0
+                while i < len(selected_values) - 2:
+                    title += '{}, '.format(selected_values[i])
+                    i += 1
+
+                title += '{} and {} '.format(selected_values[i],
+                                             selected_values[i+1])
+                title += 'classes recorded in the image log'
+
             fig = px.histogram(filtered_df,
                                x='label',
-                               title=('Count of {} class recorded in the '
-                                      'image log'.format(selected_value)))
+                               title=title)
+            # Center the title.
+            fig.update_layout(title_x=0.5)
 
     return fig
 
