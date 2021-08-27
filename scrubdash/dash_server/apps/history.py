@@ -5,6 +5,8 @@ import base64
 import csv
 import logging
 import math
+import time
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 import dash
@@ -30,6 +32,19 @@ layout = dbc.Container(
             dcc.Store(id='history-images-df'),
             dcc.Store(id='history-class'),
             # The 3x3 grid of images.
+            html.Div(
+                [
+                    dcc.DatePickerRange(
+                        id='date-picker-range',
+                        min_date_allowed=date(2000, 1, 1),
+                        max_date_allowed=date(2099, 12, 31),
+                        initial_visible_month=date.today(),
+                        start_date=date(2020, 1, 1),
+                        end_date=date.today()
+                    ),
+                    html.Div(id='date')
+                ]
+            ),
             html.Div(
                 [
                     dbc.Row(
@@ -181,30 +196,42 @@ layout = dbc.Container(
                     # pages the user can cycle through.
                     html.Div(
                         [
-                            # Text to render.
-                            'Page ',
-                            # The page input component.
-                            dcc.Input(
-                                id='page-input',
-                                type='number',
-                                value=1,
-                                min=1
+                            html.Div(
+                                [
+                                    # Text to render.
+                                    'Page ',
+                                    # The page input component.
+                                    dcc.Input(
+                                        id='page-input',
+                                        type='number',
+                                        value=1,
+                                        min=1
+                                    ),
+                                    # Text to render.
+                                    '/',
+                                    # Shows the total number of 3x3 pages.
+                                    html.P(
+                                        id='total-pages',
+                                        style={
+                                            'display': 'inline'
+                                        }
+                                    ),
+                                    # The error message for invalid page input.
+                                    html.P(
+                                        id='page-error',
+                                        style={
+                                            'display': 'inline',
+                                            'color': 'red'
+                                        }
+                                    )
+                                ],
+                                id='page-input-div'
                             ),
-                            # Text to render.
-                            '/',
-                            # Shows the total number of 3x3 pages.
-                            html.P(
-                                id='total-pages',
+                            html.Div(
+                                'No images to show',
+                                id='no-images',
                                 style={
                                     'display': 'inline'
-                                }
-                            ),
-                            # The error message for invalid page input.
-                            html.P(
-                                id='page-error',
-                                style={
-                                    'display': 'inline',
-                                    'color': 'red'
                                 }
                             )
                         ]
@@ -255,8 +282,10 @@ def update_history_back_link(pathname):
               Output('total-pages', 'children'),
               Output('page-input', 'max'),
               Input('url', 'pathname'),
+              Input('date-picker-range', 'start_date'),
+              Input('date-picker-range', 'end_date'),
               State('host-image-logs', 'data'))
-def display_history_page(pathname, host_logs):
+def initialize_history_page(pathname, start_date, end_date, host_logs):
     """
     Initialize the history page by updating the history class and creating
     the image log dataframe.
@@ -272,6 +301,12 @@ def display_history_page(pathname, host_logs):
     ----------
     pathname : str
         The pathname of the url in window.location
+    start_date : str
+        A string representation of the starting date chosen on the date
+        picker
+    end_date : str
+        A string representation of the ending date chosen on the date
+        picker
     host_logs : dict of { 'hostname': str }
         A dictionary that contains the absolute path to each host's
         session image log
@@ -292,10 +327,25 @@ def display_history_page(pathname, host_logs):
     log_path = host_logs[hostname]
     image_df = pd.read_csv(log_path)
 
-    # Drop rows that do not contain the history class and reset the
-    # indices for sorting.
+    # Drop rows that do not contain the history class.
     filtered = (image_df[image_df['labels'].str
-                .contains(image_class)].reset_index(drop=True))
+                .contains(image_class)])
+
+    # Parse datetime from start_date.
+    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+    # Add 1 day to selected end_date to include images taken on the end_date.
+    end_date = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+
+    # Convert datetime into unix timestamp.
+    start_timestamp = time.mktime(start_date.timetuple())
+    end_timestamp = time.mktime(end_date.timetuple())
+
+    # Drop rows with timestamp outside the selected dates and reset the
+    # indicies for sorting.
+    filtered = (filtered[(filtered['timestamp'] >= start_timestamp) &
+                         (filtered['timestamp'] <= end_timestamp)]
+                .reset_index(drop=True))
+
     # Sorts paths in descending order (most recent to least recent).
     filtered.sort_values(ascending=False, by=['path'], inplace=True)
 
@@ -344,7 +394,7 @@ def create_history_header(pathname):
               Input({'type': 'sq-img', 'index': ALLSMALLER}, 'src'),
               Input('history-class', 'data'),
               Input('page-index', 'data'),
-              Input('history-images-df', 'data'),
+              State('history-images-df', 'data'),
               prevent_initial_call=True)
 def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
     """
@@ -392,7 +442,11 @@ def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
     filtered_df = pd.read_json(json_df, orient='index')
 
     # Gets a list containing the path, lboxes, and datetime for each image.
-    image_list = filtered_df[['path', 'lboxes', 'datetime']].values.tolist()
+    if len(filtered_df) == 0:
+        image_list = []
+    else:
+        image_list = (filtered_df[['path', 'lboxes', 'datetime']]
+                      .values.tolist())
 
     # Calculate the index of the image that triggered the callback.
     current_image_index = ((page - 1) * 9) + index
@@ -401,8 +455,10 @@ def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
 
     # The comparison operator is < and not <= since the image indices
     # start at 0 whereas the number of total images starts at 1. Therefore
-    # the current_image_index must be strictly less than total_images.
-    if current_image_index < total_images:
+    # the current_image_index must be strictly less than total_images.  We
+    # must also check that total_images is not 0, which occurs when there
+    # are no images to show.
+    if current_image_index < total_images and total_images != 0:
         # Image index is in the dataframe.
         image = image_list[current_image_index]
         image_path = image[0]
@@ -456,10 +512,11 @@ def slider_value(values):
               Input('prev-btn', 'n_clicks'),
               Input('next-btn', 'n_clicks'),
               Input('page-input', 'value'),
+              Input('history-images-df', 'data'),
               State('page-index', 'data'),
               State('total-pages', 'children'),
               prevent_initial_call=True)
-def next_page(prev_btn, next_btn, page_input, page, total_pages):
+def next_page(prev_btn, next_btn, page_input, json_df, page, total_pages):
     """
     Update the page index when clicking the `Next` or `Back` buttons.
 
@@ -471,6 +528,9 @@ def next_page(prev_btn, next_btn, page_input, page, total_pages):
         The number of times the button has been clicked on
     page_input : int
         The user input specifying what 3x3 page they want to see
+    json_df
+        A json representation of the transformed dataframe used by the
+        history page
     page : int
         The current 3x3 grid page (pages are indexed at 1)
     total_pages : int
@@ -488,8 +548,21 @@ def next_page(prev_btn, next_btn, page_input, page, total_pages):
 
     # Get the id of the component that triggered the callback.
     trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+    error_msg = ''
 
-    if trigger == 'next-btn':
+    if trigger == 'history-images-df':
+        # Convert the history data from a json to a pandas dataframe.
+        filtered_df = pd.read_json(json_df, orient='index')
+        if len(filtered_df) == 0:
+            # Set page count to 0 because there are no pages to show.
+            # Setting the page to 0 is a hack that fixes a whole slew of
+            # issues like not rendering the next or back buttons, and not
+            # trying to render any images in the 3x3 grid.
+            page = 0
+        else:
+            # Reset the page count back to 1.
+            page = 1
+    elif trigger == 'next-btn':
         page += 1
     elif trigger == 'prev-btn':
         page -= 1
@@ -517,7 +590,7 @@ def next_page(prev_btn, next_btn, page_input, page, total_pages):
 @app.callback(Output('prev-btn', 'style'),
               Output('next-btn', 'style'),
               Input('page-index', 'data'),
-              Input('history-images-df', 'data'),
+              State('history-images-df', 'data'),
               prevent_initial_call=True)
 def render_buttons(page, json_df):
     """
@@ -552,7 +625,7 @@ def render_buttons(page, json_df):
     current_max_image_index = page * 9
 
     # Checks to see if there are more images to show.
-    if total_images >= current_max_image_index:
+    if total_images >= current_max_image_index and total_images != 0:
         render_next = True
     else:
         render_next = False
@@ -866,3 +939,47 @@ def toggle_collapse(n_clicks, modal_open, collapse_open):
 
     if trigger == 'collapse-button':
         return not collapse_open
+
+
+@app.callback(Output('page-input-div', 'style'),
+              Output('no-images', 'style'),
+              Input('history-images-df', 'data'))
+def render_no_images_to_show_message(json_df):
+    """
+    Determine whether to render the page input box or the 'No images to
+    show' message.
+
+    This callback utilizes the style attribute to make the page input
+    element invisible and make the 'No images to show' message visible
+    when no images exist in the pandas dataframe.
+
+    This can happen if there are no images taken of a particular class at
+    all, or if there are no images taken of a class within the selected
+    start and end date.
+
+    Parameters
+    ----------
+    json_df
+        A json representation of the transformed dataframe used by the
+        histogram and time graph
+
+    Returns
+    -------
+    CSS Display Property
+        A CSS display property specifying whether to render the page input
+        box
+    CSS Display Property
+        A CSS display property specifying whether to render the 'No images
+        seen' message
+    """
+    # Convert the history data from a json to a pandas dataframe.
+    filtered_df = pd.read_json(json_df, orient='index')
+
+    if len(filtered_df) == 0:
+        input_style = {'display': 'none'}
+        no_images_style = {'display': 'inline'}
+    else:
+        input_style = {'display': 'inline'}
+        no_images_style = {'display': 'none'}
+
+    return input_style, no_images_style
