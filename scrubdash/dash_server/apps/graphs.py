@@ -21,6 +21,7 @@ time_span = [
     {'label': '1 Week', 'value': 'week'},
     {'label': '1 Month', 'value': 'month'},
     {'label': '1 Year', 'value': 'year'},
+    {'label': 'Max', 'value': 'max'}
 ]
 
 time_intervals = [
@@ -33,7 +34,7 @@ time_intervals = [
     {'label': '1 Month', 'value': '1M'},
     {'label': '3 Months', 'value': '3M'},
     {'label': '6 Months', 'value': '6M'},
-    {'label': '1 Year', 'value': '1Y'},
+    {'label': '1 Year', 'value': '1Y'}
 ]
 
 layout = html.Div(
@@ -67,7 +68,7 @@ layout = html.Div(
                 # Class Dropdown.
                 html.Div(
                     [
-                        html.P('Class:'),
+                        html.Div('Class:'),
                         dcc.Dropdown(
                             id='time-class',
                             value='All'
@@ -77,24 +78,36 @@ layout = html.Div(
                 # Time Span Dropdown.
                 html.Div(
                     [
-                        html.P('Time Span to Graph:'),
-                        dcc.Dropdown(
-                            id='time-span',
-                            options=time_span,
-                            value='week'
+                        html.Div('Time Span to Graph:'),
+                        html.Div(
+                            dbc.RadioItems(
+                                id='time-span',
+                                className='btn-group',
+                                labelClassName='btn btn-outline-primary',
+                                labelCheckedClassName='active',
+                                options=time_span,
+                                value='week'
+                            )
                         )
-                    ]
+                    ],
+                    className='radio-group'
                 ),
                 # Time Interval Dropdown.
                 html.Div(
                     [
-                        html.P('Time Interval:'),
-                        dcc.Dropdown(
-                            id='time-interval',
-                            options=time_intervals,
-                            value='24H'
+                        html.Div('Bucket Interval Size:'),
+                        html.Div(
+                            dbc.RadioItems(
+                                id='bucket-interval',
+                                className='btn-group',
+                                labelClassName='btn btn-outline-primary',
+                                labelCheckedClassName='active',
+                                options=time_intervals,
+                                value='24H'
+                            )
                         )
-                    ]
+                    ],
+                    className='radio-group'
                 ),
                 html.Div(
                     # The actual time histogram.
@@ -293,10 +306,11 @@ def _update_time_histogram_class(selected_class, df):
         filtered_df = df[df['label'] == selected_class]
         fig = px.histogram(filtered_df,
                            x='datetime',
-                           title='Histogram for {} Class'
+                           title='Histogram for the {} Class'
                            .format(selected_class.capitalize()))
 
-    fig.update_layout(bargap=0.2)
+    # Center the title and create gaps between the buckets.
+    fig.update_layout(bargap=0.2, title_x=0.5)
 
     return fig
 
@@ -317,7 +331,7 @@ def _update_time_histogram_x_axes(fig, selected_class, selected_span,
     selected_span : str
         The selected domain to show on the time histogram x-axis
     selected_interval : str
-        The selected interval to bin each bucket
+        The selected interval size to bin each bucket
     df
         The transformed dataframe used by the histogram and time histogram
 
@@ -331,7 +345,7 @@ def _update_time_histogram_x_axes(fig, selected_class, selected_span,
         'day': timedelta(days=1),
         'week': timedelta(days=7),
         'month': timedelta(days=31),
-        'year': timedelta(days=365),
+        'year': timedelta(days=365)
     }
 
     interval_options = {
@@ -348,23 +362,30 @@ def _update_time_histogram_x_axes(fig, selected_class, selected_span,
     }
 
     now = datetime.now()
-    # epoch stands for the starting time of the selected span.
-    epoch = now - span_options[selected_span]
 
+    # Check class.
     if selected_class == 'All':
         class_df = df
     else:
         class_df = df[df['label'] == selected_class]
 
-    # Keep rows whose timestamp equal to or after the start of the epoch.
-    filtered_df = class_df[class_df['timestamp'] >= epoch]
+    # Check time span.
+    if selected_span == 'max':
+        epoch_formatted = None
+        filtered_df = class_df
+    else:
+        # epoch stands for the starting time of the selected span.
+        epoch = now - span_options[selected_span]
+        epoch_formatted = epoch.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Keep rows whose timestamp equal to or after the start of the epoch.
+        filtered_df = class_df[class_df['timestamp'] >= epoch]
 
     # No results found for selected span.
     if len(filtered_df) == 0:
         fig = no_results_fig
     # Results exist in the selected span.
     else:
-        epoch_formatted = epoch.strftime('%Y-%m-%d %H:%M:%S')
         time_interval = interval_options[selected_interval]
 
         # Update the x-axis domain and bin size.
@@ -379,7 +400,7 @@ def _update_time_histogram_x_axes(fig, selected_class, selected_span,
 @app.callback(Output('time-histogram', 'figure'),
               Input('time-class', 'value'),
               Input('time-span', 'value'),
-              Input('time-interval', 'value'),
+              Input('bucket-interval', 'value'),
               Input('label-count', 'data'))
 def update_time_histogram(selected_class, selected_span,
                           selected_interval, json_df):
@@ -394,7 +415,7 @@ def update_time_histogram(selected_class, selected_span,
     selected_span : str
         The selected domain to show on the time histogram x-axis
     selected_interval : str
-        The selected interval to bin each bucket
+        The selected interval size to bin each bucket
     json_df
         A json representation of the transformed dataframe used by the
         histogram and time histogram
