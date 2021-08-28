@@ -11,7 +11,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import hosts, graphs, grid, history
+from scrubdash.dash_server.apps import graphs, grid, history, main_page
 from scrubdash.dash_server.images import create_image_dict
 
 log = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ def start_dash(configs, asyncio_queue):
             A page layout written with Dash HTML Components
         """
         if pathname == '/':
-            return hosts.layout
+            return main_page.layout
         # Matches with '/[hostname]/graph'
         elif re.match('/[a-zA-Z0-9_]+/graphs', pathname):
             return graphs.layout

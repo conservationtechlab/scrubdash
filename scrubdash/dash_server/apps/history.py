@@ -156,11 +156,11 @@ layout = dbc.Container(
                     href=''
                 )
             ),
-            # Back button to the hosts page.
+            # Back button to the main page.
             html.Div(
                 html.A(
                     id='host-back-btn',
-                    children='Go back to hosts page',
+                    children='Go back to main page',
                     href='/'
                 )
             ),
