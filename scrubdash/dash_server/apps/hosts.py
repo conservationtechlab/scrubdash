@@ -8,17 +8,37 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
+from scrubdash.dash_server.apps.navbar import navbar
 from scrubdash.dash_server.networking import check_connection
 
 log = logging.getLogger(__name__)
 
 layout = dbc.Container(
-        [
-            html.Div(
-                id='host-grid'
-            )
-        ]
-    )
+    [
+        navbar,
+        html.Div(
+            dbc.Container(
+                [
+                    html.Div(
+                        html.H1(
+                            'ScrubCam Devices',
+                            className='text-center p-4'
+                        )
+                    ),
+                    html.Div(
+                        id='host-grid'
+                    )
+                ]
+            ),
+            style={
+                'background-color': '#e5ece8',
+                'padding-bottom': '40px'
+            }
+        )
+    ],
+    style={'max-width': '1250px'},
+    fluid=True
+)
 
 
 @app.callback(Output('host-grid', 'children'),
@@ -45,12 +65,16 @@ def update_cams(host_timestamps):
     """
     if not host_timestamps:
         # No ScrubCam has connected yet.
-        return "Waiting to connect to scrubcam..."
+        return 'Waiting to connect to scrubcam...'
 
-    # Create the grid.
+    # Create the grid.  The grid only consists of one row since each
+    # dbc.Card has a responsive width to the screen size.  Using only
+    # one row is the only way to get a responsive row where there are
+    # three columns (aka. dbc.Cards) per row for larger screens, two
+    # cols per row for medium and small screens, and one col per row
+    # for extra small screens.
     grid = []
     row = []
-    col = 0
 
     for hostname, timestamp in host_timestamps.items():
         heartbeat = datetime.utcfromtimestamp(timestamp)
@@ -59,32 +83,33 @@ def update_cams(host_timestamps):
         row.append(
             dbc.Col(
                 html.Div(
-                    [
-                        # Link to a host's filter class grid page.
-                        html.A(
-                            html.Div(hostname),
-                            href='/{}'.format(hostname)
+                    dbc.Card(
+                        dbc.CardBody(
+                            [
+                                # Link to a host's filter class grid page.
+                                html.A(
+                                    html.H3(hostname),
+                                    href='/{}'.format(hostname),
+                                    className='text-center'
+                                ),
+                                # The connected/disconnected message.
+                                html.Div(
+                                    connection_msg,
+                                    className='text-center',
+                                    style=text_color
+                                )
+                            ]
                         ),
-                        # The connected/disconnected message.
-                        html.Div(
-                            connection_msg,
-                            style=text_color
-                        )
-                    ]
-                )
+                        outline=True,
+                        color='success',
+                    ),
+                    className='pb-4'
+                ),
+                # Reponsive column widths for each screen size.
+                xs=12, sm=6, md=6, lg=4, xl=4
             )
         )
 
-        col += 1
-
-        if col == 3:
-            col = 0
-            grid.append(dbc.Row(row))
-            row = []
-
-    # If we didn't have a multiple of 3 hosts, the last row never got
-    # appended to grid, so we need to append it now.
-    if col != 0:
-        grid.append(dbc.Row(row))
+    grid.append(dbc.Row(row))
 
     return grid

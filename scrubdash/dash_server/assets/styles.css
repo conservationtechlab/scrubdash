@@ -28,3 +28,17 @@ img {
   border-bottom-left-radius: 0;
   margin-left: -1px;
 }
+
+/* navbar and home page styles */
+.light-green {
+  color: #62a138
+}
+
+.nav-link {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.nav-link:hover {
+  color: #29bd1a !important;
+}
