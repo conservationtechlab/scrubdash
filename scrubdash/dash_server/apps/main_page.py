@@ -8,14 +8,14 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps.navbar import navbar
+from scrubdash.dash_server.apps.navbar import default_navbar
 from scrubdash.dash_server.networking import check_connection
 
 log = logging.getLogger(__name__)
 
 layout = dbc.Container(
     [
-        navbar,
+        default_navbar,
         html.Div(
             dbc.Container(
                 [

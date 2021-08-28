@@ -7,6 +7,7 @@ import base64
 import logging
 from io import BytesIO
 
+import dash
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 import numpy as np
@@ -14,52 +15,61 @@ from dash.dependencies import Input, Output
 from PIL import Image
 
 from scrubdash.dash_server.app import app
+from scrubdash.dash_server.apps.navbar import full_navbar
 
 log = logging.getLogger(__name__)
 
 layout = dbc.Container(
-        [
-            html.Div(
+    [
+        full_navbar,
+        # Where the grid renders.
+        html.Div(
+            dbc.Container(
                 [
-                    # Link to the host's graphs page.
                     html.Div(
-                        html.A("Graphs", href='', id='graph-link')
+                        html.H1(
+                            '',
+                            id='labels-header',
+                            className='text-center p-4'
+                        )
                     ),
-                    # Where the grid renders.
                     html.Div(
-                        id='grid-content'),
-                    # Back button to the ScrubCam hosts page.
-                    html.A(
-                        id='grid-back-btn',
-                        children='Go back to ScrubCam hosts page',
-                        href='/')
+                        id='grid-content'
+                    )
                 ]
-            )
-        ]
-    )
+            ),
+            style={
+                'background-color': '#e5ece8',
+                'padding-bottom': '40px'
+            }
+        )
+    ],
+    style={'max-width': '1250px'},
+    fluid=True
+)
 
 
-@app.callback(Output('graph-link', 'href'),
+@app.callback(Output('labels-header', 'children'),
               Input('url', 'pathname'))
-def update_graph_link(pathname):
+def update_labels_header(pathname):
     """
-    Update the graphs page link to be host specific.
+    Update the labels page header on page load or refresh.
+
     Parameters
     ----------
     pathname : str
         The pathname of the url in window.location
+
     Returns
     -------
-    href: HTML Anchor href attribute
-        The href to the host's graphs page
+    header : str
+        The header for the labels page that includes the hostname
     """
     # Parse hostname.
     hostname = pathname.split('/')[1]
+    header = hostname + ' Labels'
 
-    # Create href.
-    href = '{}/graphs'.format(hostname)
-
-    return href
+    return header
 
 
 @app.callback(Output('grid-content', 'children'),
@@ -69,17 +79,22 @@ def update_grid(host_images, pathname):
     """
     Update the grid to show the most recent images taken for each class.
     This callback is triggered when the host image dictionary changes.
+
     Parameters
     ----------
     host_images : dict of { 'hostname': str }
         A dictionary that contains the absolute path to each
         host's session image log
+    pathmame : str
+        The pathname of the url in window.location
+
     Returns
     -------
     Dash HTML Component
         The grid page layout written with Dash HTML Components. It
         shows the most recent images received for each class in filter
         classes
+
     Notes
     -----
     Reference for base64 encoding the image: https://stackoverflow.com/questions/3715493/encoding-an-image-file-with-base64
@@ -93,15 +108,25 @@ def update_grid(host_images, pathname):
     # Parse hostname.
     hostname = pathname.split('/')[1]
     # Get hostname's image dictionary.
-    image_dict = host_images[hostname]
+    try:
+        image_dict = host_images[hostname]
+    except KeyError:
+        # KeyError when returning to the home page since the hostname
+        # is ''.
+        return dash.no_update
 
-    # Create the grid.
+    # Create the grid.  The grid only consists of one row since each
+    # dbc.Card has a responsive width to the screen size.  Using only
+    # one row is the only way to get a responsive row where there are
+    # three columns (aka. dbc.Cards) per row for larger screens, two
+    # cols per row for medium and small screens, and one col per row
+    # for extra small screens.
     grid = []
     row = []
-    col = 0
 
     image_dict = host_images[hostname]
-    # Put 3 columns in a row with 1 image per column.
+    # Sort the dictionary by class_name.
+    image_dict = dict(sorted(image_dict.items(), key=lambda item: item[0]))
     for class_name, filename in image_dict.items():
         if not filename:
             # Draw a white rectangle if no image found for class.
@@ -110,8 +135,8 @@ def update_grid(host_images, pathname):
         else:
             source_img = Image.open(filename).convert('RGB')
 
-        # Reduce the image size so it renders faster.
-        source_img = source_img.resize((round(1920/8), round(1080/8)))
+        # Reduce the image size so it renders faster and fits on the page.
+        source_img = source_img.resize((round(1920/4), round(1080/4)))
 
         # Create a temporary buffer to get image binary.
         buffer = BytesIO()
@@ -128,26 +153,26 @@ def update_grid(host_images, pathname):
                             html.Img(
                                 id=class_name,
                                 src='data:image/png;base64,{}'
-                                .format(base64_image)
+                                .format(base64_image),
                             ),
                             href='/{}/{}'.format(hostname, class_name)
                         ),
-                        html.Div(class_name.capitalize())
-                    ]
-                )
+                        html.H4(
+                            html.A(
+                                class_name.capitalize(),
+                                href='/{}/{}'.format(hostname, class_name)
+                            ),
+                            className='pt-2'
+                        )
+                    ],
+                    className='text-center'
+                ),
+                className='pb-4',
+                # Reponsive column widths for each screen size.
+                xs=12, sm=6, md=6, lg=4, xl=4
             )
         )
 
-        col += 1
-
-        if col == 3:
-            col = 0
-            grid.append(dbc.Row(row))
-            row = []
-
-    # If we didn't have a multiple of 3 hosts, the last row never got
-    # appended to grid, so we need to append it now.
-    if col != 0:
-        grid.append(dbc.Row(row))
+    grid.append(dbc.Row(row))
 
     return grid
