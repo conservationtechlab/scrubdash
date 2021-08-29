@@ -22,8 +22,14 @@ layout = dbc.Container(
                     html.Div(
                         html.H1(
                             'ScrubCam Devices',
-                            className='text-center p-4'
-                        )
+                            className='header px-5 pt-3',
+                        ),
+                        className='text-center py-2'
+                    ),
+                    html.P(
+                        ('This is the home page of ScrubDash. Click on a '
+                         'device to get started!'),
+                        className='gray-text text-center pb-4 mb-4 mt-1'
                     ),
                     html.Div(
                         id='host-grid'
@@ -31,7 +37,6 @@ layout = dbc.Container(
                 ]
             ),
             style={
-                'background-color': '#e5ece8',
                 'padding-bottom': '40px'
             }
         )
@@ -76,6 +81,9 @@ def update_cams(host_timestamps):
     grid = []
     row = []
 
+    # Sort the dictionary by hostname.
+    host_timestamps = dict(sorted(host_timestamps.items(),
+                                  key=lambda item: item[0]))
     for hostname, timestamp in host_timestamps.items():
         heartbeat = datetime.utcfromtimestamp(timestamp)
         connection_msg, text_color = check_connection(heartbeat)
@@ -90,12 +98,12 @@ def update_cams(host_timestamps):
                                 html.A(
                                     html.H3(hostname),
                                     href='/{}'.format(hostname),
-                                    className='text-center'
+                                    className='text-center light-green'
                                 ),
                                 # The connected/disconnected message.
                                 html.Div(
                                     connection_msg,
-                                    className='text-center',
+                                    className='text-center font-weight-bold',
                                     style=text_color
                                 )
                             ]
@@ -103,7 +111,7 @@ def update_cams(host_timestamps):
                         outline=True,
                         color='success',
                     ),
-                    className='pb-4'
+                    className='pb-4 mt-1 mb-1'
                 ),
                 # Reponsive column widths for each screen size.
                 xs=12, sm=6, md=6, lg=4, xl=4
