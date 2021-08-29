@@ -16,26 +16,24 @@ log = logging.getLogger(__name__)
 layout = dbc.Container(
     [
         default_navbar,
-        html.Div(
-            dbc.Container(
-                [
-                    html.Div(
-                        html.H1(
-                            'ScrubCam Devices',
-                            className='header px-5 pt-3',
-                        ),
-                        className='text-center py-2'
+        dbc.Container(
+            [
+                html.Div(
+                    html.H1(
+                        'ScrubCam Devices',
+                        className='header px-5 pt-3',
                     ),
-                    html.P(
-                        ('This is the home page of ScrubDash. Click on a '
-                         'device to get started!'),
-                        className='gray-text text-center pb-4 mb-4 mt-1'
-                    ),
-                    html.Div(
-                        id='host-grid'
-                    )
-                ]
-            ),
+                    className='text-center py-2'
+                ),
+                html.P(
+                    ('This is the home page of ScrubDash. Click on a '
+                        'device to get started!'),
+                    className='gray-text text-center pb-4 mb-4 mt-1'
+                ),
+                html.Div(
+                    id='host-grid'
+                )
+            ],
             style={
                 'padding-bottom': '40px'
             }

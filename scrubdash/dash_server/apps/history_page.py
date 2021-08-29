@@ -139,7 +139,7 @@ layout = dbc.Container(
                         ]
                     )
                 ],
-                id='history-grid',
+                id='history-grid'
             )
         ),
         # The modal component that shows the image rendered with
@@ -188,7 +188,7 @@ layout = dbc.Container(
                         # component.
                         html.Div(
                             dbc.Button(
-                                "Pick font color",
+                                'Pick font color',
                                 id='collapse-button',
                                 color='success',
                                 n_clicks=0,

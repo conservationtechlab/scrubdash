@@ -22,27 +22,25 @@ layout = dbc.Container(
     [
         full_navbar,
         # Where the grid renders.
-        html.Div(
-            dbc.Container(
-                [
-                    html.Div(
-                        html.H1(
-                            '',
-                            id='labels-header',
-                            className='header px-5 pt-3',
-                        ),
-                        className='text-center py-2'
-                    ),
-                    html.P(
+        dbc.Container(
+            [
+                html.Div(
+                    html.H1(
                         '',
-                        id='labels-desc',
-                        className='gray-text text-center pb-4 mb-4 mt-1'
+                        id='labels-header',
+                        className='header px-5 pt-3',
                     ),
-                    html.Div(
-                        id='labels-grid'
-                    )
-                ]
-            ),
+                    className='text-center py-2'
+                ),
+                html.P(
+                    '',
+                    id='labels-desc',
+                    className='gray-text text-center pb-4 mb-4 mt-1'
+                ),
+                html.Div(
+                    id='labels-grid'
+                )
+            ],
             style={
                 'padding-bottom': '40px'
             }
@@ -69,6 +67,8 @@ def update_labels_header(pathname):
     -------
     header : str
         The header for the labels page that includes the hostname
+    desc: str
+        A description of what the labels page shows
     """
     # Parse hostname.
     hostname = pathname.split('/')[1]
@@ -146,7 +146,7 @@ def update_grid(host_images, pathname):
             source_img = Image.open(filename).convert('RGB')
 
         # Reduce the image size so it renders faster and fits on the page.
-        source_img = source_img.resize((round(1920/4), round(1080/4)))
+        source_img = source_img.resize((round(1920 / 4), round(1080 / 4)))
 
         # Create a temporary buffer to get image binary.
         buffer = BytesIO()
