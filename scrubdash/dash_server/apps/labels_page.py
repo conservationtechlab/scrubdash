@@ -74,10 +74,11 @@ def update_labels_header(pathname):
     hostname = pathname.split('/')[1]
     header = hostname + ' Labels'
 
-    desc = ('This page shows the labels that the {} device takes images of. '
-            'Each image shown in the grid is the most recent photo taken of '
-            'that particular label. Click on the image or label name to see a '
-            'history of images taken for that label.'.format(hostname))
+    desc = ('This page shows the labels the {} device takes images of. Each '
+            'image in the grid shows the most recent photo taken for that '
+            'label. Click on the image to view that label\'s history page or '
+            'click on the graphs link in the navbar to visualize image data.'
+            .format(hostname))
 
     return header, desc
 

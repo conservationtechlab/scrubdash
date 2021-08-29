@@ -199,7 +199,7 @@ layout = dbc.Container(
                         dbc.Collapse(
                             daq.ColorPicker(
                                 id='color-picker',
-                                label=('Color Picker'
+                                label=('Color Picker '
                                        '(alpha value not supported)'),
                                 value=dict(rgb=dict(r=255, g=255, b=255))
                             ),

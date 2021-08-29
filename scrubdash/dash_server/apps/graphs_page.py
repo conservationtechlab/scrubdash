@@ -230,9 +230,8 @@ def update_graphs_header(pathname):
     hostname = pathname.split('/')[1]
     header = hostname + ' Graphs'
 
-    desc = ('This page shows features two histograms that will help you '
-            'explore and visualize image data from the {} device.'
-            .format(hostname))
+    desc = ('This page features two histograms that will help you explore '
+            'and visualize image data from the {} device.'.format(hostname))
 
     return header, desc
 
