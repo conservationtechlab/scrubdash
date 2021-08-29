@@ -9,22 +9,39 @@ from scrubdash.dash_server.app import app
 
 # Navbar for the logo.
 logo_navbar = dbc.Navbar(
-    html.A(
-        # Use row and col to control vertical alignment
-        # of logo / brand.
-        dbc.Row(
-            dbc.Col(
-                html.Img(
-                    src='../assets/sage-logo.png',
-                    height='100px',
-                    className='border-0'
-                )
+    [
+        html.A(
+            # Use row and col to control vertical alignment
+            # of logo / brand.
+            dbc.Row(
+                dbc.Col(
+                    html.Img(
+                        src='../assets/scrubdash-logo.png',
+                        height='100px',
+                        className='border-0'
+                    )
+                ),
+                align='center',
+                no_gutters=True,
             ),
-            align='center',
-            no_gutters=True,
+            href='/',
         ),
-        href='/',
-    ),
+        html.Div(
+            [
+                html.A(
+                    'GITHUB',
+                    href='https://github.com/icr-ctl/scrubdash',
+                    className='nav-link-secondary mr-4'
+                ),
+                html.A(
+                    'CREDITS',
+                    href='/credits',
+                    className='nav-link-secondary'
+                )
+            ],
+            className='ml-auto mb-auto'
+        ),
+    ],
     color='white'
 )
 
@@ -40,7 +57,7 @@ default_navbar = html.Div(
                 dbc.NavLink(
                     'HOME',
                     href='/',
-                    className='nav-link mr-2 ml-2'
+                    className='nav-link-primary mr-2 ml-2'
                 )
             ),
             color='#215732'
@@ -63,7 +80,7 @@ full_navbar = html.Div(
                     dbc.NavLink(
                         'HOME',
                         href='/',
-                        className='nav-link mr-2 ml-2'
+                        className='nav-link-primary mr-2 ml-2'
                     )
                 ),
                 # Link to get back to a ScrubCam's labels grid.
@@ -72,7 +89,7 @@ full_navbar = html.Div(
                         'LABELS',
                         id='nav-labels',
                         href='',
-                        className='nav-link mr-2 ml-2'
+                        className='nav-link-primary mr-2 ml-2'
                     )
                 ),
                 # Link to get back to a ScrubCam's graphs page.
@@ -81,7 +98,7 @@ full_navbar = html.Div(
                         'GRAPHS',
                         id='nav-graphs',
                         href='',
-                        className='nav-link mr-2 ml-2'
+                        className='nav-link-primary mr-2 ml-2'
                     )
                 )
             ],
