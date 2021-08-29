@@ -1,6 +1,5 @@
 """
-This module contains the layout and callbacks for a ScrubCam's image class
-page.
+This module contains the layout and callbacks for a ScrubCam's labels page.
 """
 
 import base64
@@ -34,7 +33,7 @@ layout = dbc.Container(
                         )
                     ),
                     html.Div(
-                        id='grid-content'
+                        id='labels-content'
                     )
                 ]
             ),
@@ -72,7 +71,7 @@ def update_labels_header(pathname):
     return header
 
 
-@app.callback(Output('grid-content', 'children'),
+@app.callback(Output('labels-content', 'children'),
               Input('host-images', 'data'),
               Input('url', 'pathname'))
 def update_grid(host_images, pathname):

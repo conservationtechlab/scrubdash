@@ -11,7 +11,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import graphs, grid, history, main_page
+from scrubdash.dash_server.apps import graphs, history, labels_page, main_page
 from scrubdash.dash_server.images import create_image_dict
 
 log = logging.getLogger(__name__)
@@ -170,7 +170,7 @@ def start_dash(configs, asyncio_queue):
             return history.layout
         # Matches with '/[hostname]'
         else:
-            return grid.layout
+            return labels_page.layout
 
     app.run_server(host=DASH_IP, port=DASH_PORT)
 
