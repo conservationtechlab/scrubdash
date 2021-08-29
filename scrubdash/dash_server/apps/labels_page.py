@@ -29,16 +29,21 @@ layout = dbc.Container(
                         html.H1(
                             '',
                             id='labels-header',
-                            className='text-center p-4'
-                        )
+                            className='header px-5 pt-3',
+                        ),
+                        className='text-center py-2'
+                    ),
+                    html.P(
+                        '',
+                        id='labels-desc',
+                        className='gray-text text-center pb-4 mb-4 mt-1'
                     ),
                     html.Div(
-                        id='labels-content'
+                        id='labels-grid'
                     )
                 ]
             ),
             style={
-                'background-color': '#e5ece8',
                 'padding-bottom': '40px'
             }
         )
@@ -49,6 +54,7 @@ layout = dbc.Container(
 
 
 @app.callback(Output('labels-header', 'children'),
+              Output('labels-desc', 'children'),
               Input('url', 'pathname'))
 def update_labels_header(pathname):
     """
@@ -68,10 +74,15 @@ def update_labels_header(pathname):
     hostname = pathname.split('/')[1]
     header = hostname + ' Labels'
 
-    return header
+    desc = ('This page shows the labels that the {} device takes images of. '
+            'Each image shown in the grid is the most recent photo taken of '
+            'that particular label. Click on the image or label name to see a '
+            'history of images taken for that label.'.format(hostname))
+
+    return header, desc
 
 
-@app.callback(Output('labels-content', 'children'),
+@app.callback(Output('labels-grid', 'children'),
               Input('host-images', 'data'),
               Input('url', 'pathname'))
 def update_grid(host_images, pathname):
@@ -153,20 +164,22 @@ def update_grid(host_images, pathname):
                                 id=class_name,
                                 src='data:image/png;base64,{}'
                                 .format(base64_image),
+                                className='rounded'
                             ),
                             href='/{}/{}'.format(hostname, class_name)
                         ),
                         html.H4(
                             html.A(
                                 class_name.capitalize(),
-                                href='/{}/{}'.format(hostname, class_name)
+                                href='/{}/{}'.format(hostname, class_name),
+                                className='light-green'
                             ),
-                            className='pt-2'
+                            className='pt-3',
                         )
                     ],
                     className='text-center'
                 ),
-                className='pb-4',
+                className='pb-4 mt-1 mb-1',
                 # Reponsive column widths for each screen size.
                 xs=12, sm=6, md=6, lg=4, xl=4
             )

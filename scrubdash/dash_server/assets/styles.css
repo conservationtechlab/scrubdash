@@ -29,11 +29,29 @@ img {
   margin-left: -1px;
 }
 
-/* navbar and home page styles */
+/* Header, text, and URL styles */
 .light-green {
-  color: #62a138
+  color: #62a138 !important;
 }
 
+.gray-text {
+  font-size: 20px;
+  font-weight: 500;
+  color: #787878 !important;
+  line-height:26px;
+  max-width: 900px;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.header {
+  color: #215732 !important;
+  display: inline-block !important;
+  border-bottom: 3px solid #62a138 !important;
+  padding-bottom: 5px !important;
+}
+
+/* navbar and home page styles */
 .nav-link {
   color: #ffffff !important;
   font-weight: 700;
