@@ -60,3 +60,20 @@ img {
 .nav-link:hover {
   color: #29bd1a !important;
 }
+
+/* graphs page styles */
+.graph-header {
+  color: #62a138 !important;
+  padding-bottom: 5px !important;
+  margin-bottom: 20px;
+}
+
+.graph-divider {
+  border-top: 3px solid #62a138 !important;
+  padding-top: 30px;
+  margin-top: 10px;
+}
+
+.light-gray {
+  color: #787878 !important;
+}

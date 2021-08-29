@@ -11,6 +11,7 @@ import plotly.express as px
 from dash.dependencies import Input, Output, State
 
 from scrubdash.dash_server.app import app
+from scrubdash.dash_server.apps.navbar import full_navbar
 from scrubdash.dash_server.dataframe import transform_graphs_dataframe
 
 log = logging.getLogger(__name__)
@@ -37,108 +38,205 @@ time_intervals = [
     {'label': '1 Year', 'value': '1Y'}
 ]
 
-layout = html.Div(
+layout = dbc.Container(
     [
-        # Histogram by Class.
-        dbc.Container(
+        full_navbar,
+        html.Div(
             [
-                html.H1('Aggregate Counts by Class'),
-                html.Div(
+                dbc.Container(
                     [
-                        dcc.Store(id='label-count'),
-                        dcc.Dropdown(
-                            id='agg-dropdown',
-                            value=['All'],
-                            multi=True,
+                        # Header.
+                        html.Div(
+                            html.H1(
+                                '',
+                                id='graphs-header',
+                                className='header px-5 pt-3',
+                            ),
+                            className='text-center py-2'
+                        ),
+                        # Description.
+                        html.P(
+                            '',
+                            id='graphs-desc',
+                            className='gray-text text-center pb-4 mb-4 mt-1'
+                        ),
+                    ]
+                ),
+                # Aggregate Histogram by Class.
+                dbc.Container(
+                    [
+                        html.H2(
+                            'Aggregate Counts by Class',
+                            className=('graph-header graph-divider '
+                                       'text-center px-5')
+                        ),
+                        html.Div(
+                            [
+                                dcc.Store(id='label-count'),
+                                dcc.Dropdown(
+                                    id='agg-dropdown',
+                                    value=['All'],
+                                    multi=True,
+                                )
+                            ]
+                        ),
+                        html.Div(
+                            # The actual histogram.
+                            dcc.Graph(id='agg-histogram'),
+                            className='mb-2'
                         )
                     ]
                 ),
-                html.Div(
-                    # The actual histogram.
-                    dcc.Graph(id='agg-histogram')
+                # Histogram by Class, Time Span, and Time.
+                # Unofficially referred to as the 'time histogram'.
+                dbc.Container(
+                    [
+                        html.H2(
+                            ('Looking at Images by Class, Time Span, and Time'
+                             ' Interval'),
+                            className=('graph-header graph-divider '
+                                       'text-center px-5 pb-4')
+                        ),
+                        # Class Dropdown.
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    html.H5(
+                                        'Class:',
+                                        className='light-gray'
+                                    ),
+                                    # Reponsive column widths for each
+                                    # screen size.
+                                    xs=2, sm=2, md=1, lg=1, xl=1
+                                ),
+                                dbc.Col(
+                                    dcc.Dropdown(
+                                        id='time-class',
+                                        value='All'
+                                    ),
+                                    # Reponsive column widths for each
+                                    # screen size.
+                                    xs=11, sm=10, md=11, lg=11, xl=11
+                                )
+                            ],
+                            className='align-items-end pb-2 mb-2'
+                        ),
+                        # Time Span Dropdown.
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    html.H5(
+                                        'Time Span to Graph:',
+                                        className='light-gray mb-2'
+                                    ),
+                                    width=12
+                                ),
+                                dbc.Col(
+                                    dbc.RadioItems(
+                                        id='time-span',
+                                        className='btn-group',
+                                        labelClassName=('btn '
+                                                        'btn-outline-success'),
+                                        labelCheckedClassName='active',
+                                        options=time_span,
+                                        value='week'
+                                    )
+                                )
+                            ],
+                            className='radio-group pb-2 mb-2'
+                        ),
+                        # Time Interval Dropdown.
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    html.H5(
+                                        'Bucket Interval Size:',
+                                        className='light-gray mb-2'
+                                    ),
+                                    width=12
+                                ),
+                                dbc.Col(
+                                    dbc.RadioItems(
+                                        id='bucket-interval',
+                                        className='btn-group',
+                                        labelClassName=('btn '
+                                                        'btn-outline-success'),
+                                        labelCheckedClassName='active',
+                                        options=time_intervals,
+                                        value='24H'
+                                    ),
+                                    # Reponsive column widths for each
+                                    # screen size.
+                                    xs=6, sm=6, md=6, lg=11, xl=11
+                                )
+                            ],
+                            className='radio-group pb-2 mb-2'
+                        ),
+                        html.Div(
+                            # The actual time histogram.
+                            dcc.Graph(id='time-histogram'),
+                        )
+                    ]
                 )
-            ]
+            ],
+            style={
+                'padding-bottom': '40px'
+            }
         ),
-        # Histogram by Class, Time Span, and Time.  Unofficially referred
-        # to as the 'time histogram'.
-        dbc.Container(
-            [
-                html.H1(('Looking at Images by Class, Time Span, and Time '
-                        'Interval')),
-                # Class Dropdown.
-                html.Div(
-                    [
-                        html.Div('Class:'),
-                        dcc.Dropdown(
-                            id='time-class',
-                            value='All'
-                        )
-                    ]
-                ),
-                # Time Span Dropdown.
-                html.Div(
-                    [
-                        html.Div('Time Span to Graph:'),
-                        html.Div(
-                            dbc.RadioItems(
-                                id='time-span',
-                                className='btn-group',
-                                labelClassName='btn btn-outline-primary',
-                                labelCheckedClassName='active',
-                                options=time_span,
-                                value='week'
-                            )
-                        )
-                    ],
-                    className='radio-group'
-                ),
-                # Time Interval Dropdown.
-                html.Div(
-                    [
-                        html.Div('Bucket Interval Size:'),
-                        html.Div(
-                            dbc.RadioItems(
-                                id='bucket-interval',
-                                className='btn-group',
-                                labelClassName='btn btn-outline-primary',
-                                labelCheckedClassName='active',
-                                options=time_intervals,
-                                value='24H'
-                            )
-                        )
-                    ],
-                    className='radio-group'
-                ),
-                html.Div(
-                    # The actual time histogram.
-                    dcc.Graph(id='time-histogram'),
-                )
-            ]
-        )
-    ]
+    ],
+    style={'max-width': '1250px'},
+    fluid=True
 )
 
 no_results_fig = {
-    "layout": {
-        "xaxis": {
-            "visible": False
+    'layout': {
+        'xaxis': {
+            'visible': False
         },
-        "yaxis": {
-            "visible": False
+        'yaxis': {
+            'visible': False
         },
-        "annotations": [
+        'annotations': [
             {
-                "text": "No matching data found",
-                "xref": "paper",
-                "yref": "paper",
-                "showarrow": False,
-                "font": {
-                    "size": 28
+                'text': 'No matching data found',
+                'xref': 'paper',
+                'yref': 'paper',
+                'showarrow': False,
+                'font': {
+                    'size': 28
                 }
             }
         ]
     }
 }
+
+
+@app.callback(Output('graphs-header', 'children'),
+              Output('graphs-desc', 'children'),
+              Input('url', 'pathname'))
+def update_graphs_header(pathname):
+    """
+    Update the graphs page header on page load or refresh.
+
+    Parameters
+    ----------
+    pathname : str
+        The pathname of the url in window.location
+
+    Returns
+    -------
+    header : str
+        The header for the graphs page that includes the hostname
+    """
+    # Parse hostname.
+    hostname = pathname.split('/')[1]
+    header = hostname + ' Graphs'
+
+    desc = ('This page shows features two histograms that will help you '
+            'explore and visualize image data from the {} device.'
+            .format(hostname))
+
+    return header, desc
 
 
 # host-classes must be an Input or else there will be callback problems.
@@ -236,7 +334,8 @@ def update_agg_histogram(selected_values, json_df):
         fig = px.histogram(df,
                            x='label',
                            title=('Count of all classes recorded in the '
-                                  'image log'))
+                                  'image log'),
+                           color_discrete_sequence=['green'])
         # Center the title.
         fig.update_layout(title_x=0.5)
     else:
@@ -266,7 +365,8 @@ def update_agg_histogram(selected_values, json_df):
 
             fig = px.histogram(filtered_df,
                                x='label',
-                               title=title)
+                               title=title,
+                               color_discrete_sequence=['green'])
             # Center the title.
             fig.update_layout(title_x=0.5)
 
@@ -300,14 +400,16 @@ def _update_time_histogram_class(selected_class, df):
         fig = px.histogram(df,
                            x='datetime',
                            histfunc='count',
-                           title='Histogram for All Classes')
+                           title='Histogram for All Classes',
+                           color_discrete_sequence=['green'])
     else:
         # Filter out rows whose label is different from the selected value.
         filtered_df = df[df['label'] == selected_class]
         fig = px.histogram(filtered_df,
                            x='datetime',
                            title='Histogram for the {} Class'
-                           .format(selected_class.capitalize()))
+                           .format(selected_class.capitalize()),
+                           color_discrete_sequence=['green'])
 
     # Center the title and create gaps between the buckets.
     fig.update_layout(bargap=0.2, title_x=0.5)
