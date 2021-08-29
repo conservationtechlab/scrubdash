@@ -77,3 +77,15 @@ img {
 .light-gray {
   color: #787878 !important;
 }
+
+/* history page styles */
+.history-sub-header {
+  color: #62a138 !important;
+  display: inline-block !important;
+  border-bottom: 3px solid #62a138 !important;
+}
+
+.big-btn {
+  width: 90px;
+  height: 40px;
+}

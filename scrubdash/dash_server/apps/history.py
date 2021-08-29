@@ -20,31 +20,83 @@ from dash.dependencies import ALL, ALLSMALLER, MATCH, Input, Output, State
 from PIL import Image, ImageDraw, ImageFont
 
 from scrubdash.dash_server.app import app
+from scrubdash.dash_server.apps.navbar import full_navbar
 
 log = logging.getLogger(__name__)
 
 layout = dbc.Container(
-    html.Div(
-        [
-            html.H1(id='history-header'),
-            # Store the current 3x3 page being shown.
-            dcc.Store(id='page-index', data=1),
-            dcc.Store(id='history-images-df'),
-            dcc.Store(id='history-class'),
-            # The 3x3 grid of images.
-            html.Div(
+    [
+        full_navbar,
+        # Store the current 3x3 page being shown.
+        dcc.Store(id='page-index', data=1),
+        dcc.Store(id='history-images-df'),
+        dcc.Store(id='history-class'),
+        # Header.
+        html.Div(
+            dbc.Container(
                 [
-                    dcc.DatePickerRange(
-                        id='date-picker-range',
-                        min_date_allowed=date(2000, 1, 1),
-                        max_date_allowed=date(2099, 12, 31),
-                        initial_visible_month=date.today(),
-                        start_date=date(2020, 1, 1),
-                        end_date=date.today()
+                    html.Div(
+                        html.H1(
+                            '',
+                            id='history-header',
+                            className='header px-5 pt-3'
+                        ),
+                        className='text-center py-2'
                     ),
-                    html.Div(id='date')
-                ]
+                    html.P(
+                        '',
+                        id='history-desc',
+                        className='gray-text text-center pb-4 mb-4 mt-1'
+                    ),
+                    # Date range picker.
+                    dbc.Row(
+                        dbc.Col(
+                            [
+                                html.Div(
+                                    html.H3(
+                                        'Select a Date Range',
+                                        className='history-sub-header text-center px-5'
+                                    ),
+                                    className='text-center py-2'
+                                ),
+                                dbc.Col(
+                                    dcc.DatePickerRange(
+                                        id='date-picker-range',
+                                        min_date_allowed=date(2000, 1, 1),
+                                        max_date_allowed=date(2099, 12, 31),
+                                        initial_visible_month=date.today(),
+                                        start_date=date(2020, 1, 1),
+                                        end_date=date.today(),
+                                        style={'margin': '0 auto'}
+                                    ),
+                                    className='text-center'
+                                )
+                            ]
+                        )
+                    )
+                ],
+                style={'padding-bottom': '50px'},
             ),
+        ),
+        # Error message when no images to show.
+        dbc.Container(
+            dbc.Row(
+                dbc.Col(
+                    dbc.Alert(
+                        'No images to show',
+                        id='no-images',
+                        color='danger',
+                        style={
+                            'display': 'none',
+                            'font-size': '36px'
+                        }
+                    )
+                ),
+                className='text-center'
+            )
+        ),
+        # The 3x3 grid of images.
+        dbc.Container(
             html.Div(
                 [
                     dbc.Row(
@@ -56,189 +108,221 @@ layout = dbc.Container(
                                             html.Img(
                                                 id={
                                                     'type': 'sq-img',
-                                                    'index': j
+                                                    'index': i
                                                 },
-                                                n_clicks=0
+                                                n_clicks=0,
+                                                className='rounded'
                                             ),
-                                            html.Div(
+                                            html.H4(
                                                 id={
                                                     'type': 'sq-header',
-                                                    'index': j
-                                                }
+                                                    'index': i
+                                                },
+                                                className='light-green pt-3',
                                             )
-                                        ]
+                                        ],
+                                        className='text-center'
                                     )
                                 ),
                                 id={
                                     'type': 'grid-square',
-                                    'index': j
+                                    'index': i
                                 },
-
+                                className='pb-4 mt-1 mb-1',
+                                # Reponsive column widths for each
+                                # screen size.
+                                xs=12, sm=6, md=6, lg=4, xl=4
                             )
-                            # Create three consecutive indicies at a time.
-                            # Eg. (1, 2, 3), (4, 5, 6), (7, 8, 9)
-                            for j in range(i * 3, (i * 3) + 3)
+                            # Create 9 squares.
+                            for i in range(9)
                         ]
                     )
-                    # Outer loop that bounds the value of j.
-                    for i in range(3)
                 ],
                 id='history-grid',
-            ),
-            # The modal component that shows the image rendered with
-            # lboxes, the confidence slider, and the color picker.
-            dbc.Modal(
-                [
-                    dbc.ModalHeader(id='modal-header'),
-                    dbc.ModalBody(
-                        [
-                            # The confidence slider.
-                            html.Div(
-                                [
-                                    dcc.RangeSlider(
-                                        id='confidence-slider',
-                                        min=0,
-                                        max=100,
-                                        step=0.5,
-                                        marks={
-                                            confidence: str(confidence)+'%'
-                                            for confidence in range(0, 101, 5)
-                                        },
-                                        value=[0, 60],
-                                        tooltip={'always_visible': True}
-                                    ),
-                                    html.Div(id='slider-output-container'),
-                                ]
-                            ),
-                            # Where the image renders.
+            )
+        ),
+        # The modal component that shows the image rendered with
+        # lboxes, the confidence slider, and the color picker.
+        dbc.Modal(
+            [
+                dbc.ModalHeader(
+                    html.H3(
+                        id='modal-header',
+                        className='history-sub-header px-3 mb-3'
+                    ),
+                    style={'margin': '0 auto'}
+                ),
+                dbc.ModalBody(
+                    [
+                        # The confidence slider.
+                        html.Div(
+                            [
+                                dcc.RangeSlider(
+                                    id='confidence-slider',
+                                    min=0,
+                                    max=100,
+                                    step=0.5,
+                                    marks={
+                                        confidence: str(confidence)+'%'
+                                        for confidence in range(0, 101, 5)
+                                    },
+                                    value=[0, 60],
+                                    tooltip={'always_visible': True},
+                                ),
+                                html.Div(
+                                    id='slider-output-container',
+                                    className='gray-text pt-3 pb-4'
+                                ),
+                            ]
+                        ),
+                        # Where the image renders.
+                        html.Div(
                             html.Img(
-                                id='modal-img'
+                                id='modal-img',
+                                className='rounded'
                             ),
-                            # Button that toggles the collapse component.
+                            className='text-center'
+                        ),
+                        # Button that toggles the color picker collapse
+                        # component.
+                        html.Div(
                             dbc.Button(
                                 "Pick font color",
                                 id='collapse-button',
-                                color='primary',
-                                n_clicks=0
+                                color='success',
+                                n_clicks=0,
                             ),
-                            # The color picker.
-                            dbc.Collapse(
-                                daq.ColorPicker(
-                                    id='color-picker',
-                                    label=('Color Picker'
-                                           '(alpha value not supported)'),
-                                    value=dict(rgb=dict(r=255, g=255, b=255))
-                                ),
-                                id='collapse-body',
-                                is_open=False,
-                            )
-                        ],
-                        id='modal-body'
-                    ),
-                    # The button to close the modal component.
-                    dbc.ModalFooter(
-                        dbc.Button(
-                            'Close',
-                            id='close',
-                            className='ml-auto',
-                            n_clicks=0
+                            className='text-center mt-3 mb-2',
+                        ),
+                        # The color picker.
+                        dbc.Collapse(
+                            daq.ColorPicker(
+                                id='color-picker',
+                                label=('Color Picker'
+                                       '(alpha value not supported)'),
+                                value=dict(rgb=dict(r=255, g=255, b=255))
+                            ),
+                            id='collapse-body',
+                            is_open=False,
                         )
+                    ],
+                    id='modal-body'
+                ),
+                # The button to close the modal component.
+                dbc.ModalFooter(
+                    dbc.Button(
+                        'Close',
+                        id='close',
+                        className='ml-auto',
+                        color='success',
+                        n_clicks=0
                     )
-                ],
-                id='modal',
-                size='lg',
-                is_open=False),
-            # Back button to the classes page.
-            html.Div(
-                html.A(
-                    id='hist-back-btn',
-                    children='Go back to classes page',
-                    href=''
                 )
-            ),
-            # Back button to the main page.
-            html.Div(
-                html.A(
-                    id='host-back-btn',
-                    children='Go back to main page',
-                    href='/'
-                )
-            ),
-            html.Div(
-                [
-                    # The back button to see the previous 3x3 image page.
-                    html.Button(
-                        'Back',
-                        id='prev-btn',
-                        n_clicks=0,
-                        style={'display': 'none'}
-                    ),
-                    # This div contains the page input box and shows many
-                    # pages the user can cycle through.
-                    html.Div(
-                        [
-                            html.Div(
-                                [
-                                    # Text to render.
-                                    'Page ',
-                                    # The page input component.
-                                    dcc.Input(
-                                        id='page-input',
-                                        type='number',
-                                        value=1,
-                                        min=1
-                                    ),
-                                    # Text to render.
-                                    '/',
-                                    # Shows the total number of 3x3 pages.
-                                    html.P(
-                                        id='total-pages',
-                                        style={
-                                            'display': 'inline'
-                                        }
-                                    ),
-                                    # The error message for invalid page input.
-                                    html.P(
-                                        id='page-error',
-                                        style={
-                                            'display': 'inline',
-                                            'color': 'red'
-                                        }
-                                    )
-                                ],
-                                id='page-input-div'
+            ],
+            id='modal',
+            size='lg',
+            is_open=False
+        ),
+        dbc.Container(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            # The back button to see the previous 3x3
+                            # image page.
+                            dbc.Button(
+                                'Back',
+                                id='prev-btn',
+                                n_clicks=0,
+                                color='success',
+                                size='lg',
+                                style={'display': 'none'}
                             ),
-                            html.Div(
-                                'No images to show',
-                                id='no-images',
+                            className='justify-content-start',
+                            width=dict(size=2, order=1)
+                        ),
+                        dbc.Col(
+                            # The next button to see the next 3x3 image grid.
+                            dbc.Button(
+                                'Next',
+                                id='next-btn',
+                                n_clicks=0,
+                                color='success',
+                                size='lg',
                                 style={
-                                    'display': 'inline'
+                                    'display': 'none'
                                 }
-                            )
-                        ]
-                    ),
-                    # The next button to see the next 3x3 image grid.
-                    html.Button(
-                        'Next',
-                        id='next-btn',
-                        n_clicks=0,
-                        style={
-                            'display': 'none'
-                        }
+                            ),
+                            className='justify-content-end',
+                            width=dict(size=2, order=3)
+                        ),
+                        # This Col contains the page input box and
+                        # shows many pages the user can cycle through.
+                        dbc.Col(
+                            [
+                                html.Div(
+                                    [
+                                        # Text to render.
+                                        'Page: ',
+                                        # The page input component.
+                                        dcc.Input(
+                                            id='page-input',
+                                            type='number',
+                                            value=1,
+                                            min=1,
+                                            style=dict(width='65px')
+                                        ),
+                                        # Text to render.
+                                        '/',
+                                        # Shows the total number of 3x3 pages.
+                                        html.P(
+                                            id='total-pages',
+                                            style={
+                                                'display': 'inline'
+                                            }
+                                        ),
+                                    ],
+                                    className='gray-text',
+                                    id='page-input-div'
+                                )
+                            ],
+                            className='text-center',
+                            width=dict(size=8, order=2)
+                        )
+                    ],
+                    className='align-items-center'
+                ),
+                dbc.Row(
+                    # The error message that appears when the page
+                    # input is out of range.
+                    dbc.Col(
+                        dbc.Alert(
+                            id='page-error',
+                            color='danger',
+                            is_open=False,
+                            style={'font-size': '24px'}
+                        ),
+                        className='text-center mt-3'
                     )
-                ],
-                id='pages'
-            )
-        ]
-    )
+                )
+            ],
+            style={
+                'padding-top': '15px',
+                'padding-bottom': '50px'
+            }
+        )
+    ],
+    style={'max-width': '1250px'},
+    fluid=True
 )
 
 
-@app.callback(Output('hist-back-btn', 'href'),
+@app.callback(Output('history-header', 'children'),
+              Output('history-desc', 'children'),
               Input('url', 'pathname'))
-def update_history_back_link(pathname):
+def update_history_header(pathname):
     """
-    Update the back link be host specific.
+    Update the history page header on page load or refresh.
 
     Parameters
     ----------
@@ -247,16 +331,22 @@ def update_history_back_link(pathname):
 
     Returns
     -------
-    href: HTML Anchor href attribute
-        The href to the host's classes page.
+    header : str
+        The page header describing the host and what label the history
+        page shows
+    desc : str
+        A description of what the history page shows
     """
-    # Parse hostname
-    hostname = pathname.split('/')[1]
+    # Parse hostname.
+    hostname, label = pathname.split('/')[1], pathname.split('/')[2]
+    header = hostname + ' || ' + label.capitalize() + ' History'
 
-    # Create href.
-    href = '/{}'.format(hostname)
+    desc = ('This page shows the history of {} images taken by the {} device. '
+            'Change the start and end dates to filter which images are '
+            'displayed. Click an image to see what objects were detected by '
+            'the {} device.'.format(label, hostname, hostname))
 
-    return href
+    return header, desc
 
 
 @app.callback(Output('history-images-df', 'data'),
@@ -337,35 +427,6 @@ def initialize_history_page(pathname, start_date, end_date, host_logs):
     total_pages = math.ceil(len(filtered)/9)
 
     return json_result, total_pages, total_pages
-
-
-@app.callback(Output('history-header', 'children'),
-              Input('url', 'pathname'))
-def create_history_header(pathname):
-    """
-    Update the history page header.
-
-    This callback is triggered when entering the history page or
-    refreshing the history page.
-
-    Parameters
-    ----------
-    pathname : str
-        The pathname of the url in window.location
-
-    Returns
-    -------
-    header : str
-        The page header describing the host and what class the history
-        page is for
-    """
-    # Parse hostname and image class.
-    hostname = pathname.split('/')[1]
-    image_class = pathname.split('/')[2]
-
-    header = '{} || {} Images'.format(hostname, image_class.capitalize())
-
-    return header
 
 
 @app.callback(Output({'type': 'sq-img', 'index': MATCH}, 'src'),
@@ -455,7 +516,7 @@ def create_history_grid(index_handle, prev_squares, pathname, page, json_df):
         display = {'display': 'none'}
 
     # Resize image to show in the 3x3 grid.
-    source_img = source_img.resize((round(1920 / 8), round(1080 / 8)))
+    source_img = source_img.resize((round(1920 / 4), round(1080 / 4)))
 
     # Create a temporary buffer to get image binary.
     buffer = BytesIO()
@@ -484,11 +545,13 @@ def slider_value(values):
     str
         A message displaying the selected confidence range
     """
-    return 'You have selected a confidence interval of: {}'.format(values)
+    return ('You have selected a confidence interval of {}%-{}%'
+            .format(values[0], values[1]))
 
 
 @app.callback(Output('page-index', 'data'),
               Output('page-input', 'value'),
+              Output('page-error', 'is_open'),
               Output('page-error', 'children'),
               Input('prev-btn', 'n_clicks'),
               Input('next-btn', 'n_clicks'),
@@ -522,6 +585,8 @@ def next_page(prev_btn, next_btn, page_input, json_df, page, total_pages):
     page : int or dash.no_update
         The updated page number after clicking on the `Next` or `Back`
         buttons
+    alert_open : bool
+        A boolean that describes if the alert component is open or not
     error_msg : str
         The error message displayed if the page input value is invalid
     """
@@ -529,6 +594,7 @@ def next_page(prev_btn, next_btn, page_input, json_df, page, total_pages):
 
     # Get the id of the component that triggered the callback.
     trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+    alert_open = False
     error_msg = ''
 
     if trigger == 'history-images-df':
@@ -553,19 +619,18 @@ def next_page(prev_btn, next_btn, page_input, json_df, page, total_pages):
             # non-numeric value or the value is not within allowed
             # minimum-maximum range.
             page = dash.no_update
+            alert_open = True
             error_msg = ('Error: The page must be between 1-{}'
                          .format(total_pages))
         elif page_input == page:
             # The user inputs the page currently being shown.
             page = dash.no_update
-            error_msg = ''
         else:
             # The user inputs a valid page that is not currently being
             # shown.
             page = page_input
-            error_msg = ''
 
-    return page, page, error_msg
+    return page, page, alert_open, error_msg
 
 
 @app.callback(Output('prev-btn', 'style'),
@@ -606,13 +671,13 @@ def render_buttons(page, json_df):
     current_max_image_index = page * 9
 
     # Checks to see if there are more images to show.
-    if total_images >= current_max_image_index and total_images != 0:
+    if total_images > current_max_image_index and total_images != 0:
         render_next = True
     else:
         render_next = False
 
     # Check if there are previous images to show.
-    if page > 0:
+    if page > 1:
         render_prev = True
     else:
         render_prev = False
@@ -881,18 +946,20 @@ def reset_color_picker(modal_open, font_color):
               Input('modal', 'is_open'),
               State('collapse-body', 'is_open'),
               prevent_initial_call=True)
-def toggle_collapse(n_clicks, modal_open, collapse_open):
+def toggle_color_picker_collapse(n_clicks, modal_open, collapse_open):
     """
-    Toggle the visibility of collapse component.
+    Toggle the visibility of the color picker collapse component.
 
-    This callback also closes collapse component when the modal component
-    closes if the collapse component is not already closed.
+    This callback also closes the collapse component when the modal
+    component closes if the collapse component is not already closed.
 
     This callback is triggered when clicking the 'Pick font color' button
     in the modal window.
 
     Parameters
     ----------
+    n_clicks : int
+        The number of times the close button has been clicked on
     modal_open : bool
         A boolean that describes if the modal component is open or not
     collapse_open : bool
@@ -951,14 +1018,14 @@ def render_no_images_to_show_message(json_df):
         box
     CSS Display Property
         A CSS display property specifying whether to render the 'No images
-        seen' message
+        to show' message
     """
     # Convert the history data from a json to a pandas dataframe.
     filtered_df = pd.read_json(json_df, orient='index')
 
     if len(filtered_df) == 0:
         input_style = {'display': 'none'}
-        no_images_style = {'display': 'inline'}
+        no_images_style = {'font-size': '36px'}
     else:
         input_style = {'display': 'inline'}
         no_images_style = {'display': 'none'}
