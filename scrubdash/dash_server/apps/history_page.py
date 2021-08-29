@@ -1,4 +1,4 @@
-"""This module contains the layout and callbacks for a class history page."""
+"""This module contains the layout and callbacks for a label's history page."""
 
 import ast
 import base64
@@ -55,7 +55,8 @@ layout = dbc.Container(
                                 html.Div(
                                     html.H3(
                                         'Select a Date Range',
-                                        className='history-sub-header text-center px-5'
+                                        className=('history-sub-header '
+                                                   'text-center px-5')
                                     ),
                                     className='text-center py-2'
                                 ),

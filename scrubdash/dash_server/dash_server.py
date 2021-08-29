@@ -11,7 +11,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import (graphs_page, history, labels_page,
+from scrubdash.dash_server.apps import (graphs_page, history_page, labels_page,
                                         main_page)
 from scrubdash.dash_server.images import create_image_dict
 
@@ -168,7 +168,7 @@ def start_dash(configs, asyncio_queue):
             return graphs_page.layout
         # Matches with '/[hostname]/[class]'
         elif re.match('/[a-zA-Z0-9_]*/[a-zA-Z0-9_]+', pathname):
-            return history.layout
+            return history_page.layout
         # Matches with '/[hostname]'
         else:
             return labels_page.layout
