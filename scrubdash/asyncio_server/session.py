@@ -411,7 +411,9 @@ class HostSession:
             append_to_yaml('IMAGE_LOG', self.IMAGE_LOG, summary)
             # Add heartbeat to summary.
             append_to_yaml('HEARTBEAT_PATH', self.HEARTBEAT_PATH, summary)
+
             # Add config settings to summary.
+            summary.write('\n# CONFIG FILE SETTINGS\n')
             for key, value in self.configs.items():
                 # value_is_list is for formatting the metadata in the yaml.
                 if isinstance(value, list):
