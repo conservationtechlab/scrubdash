@@ -68,7 +68,13 @@ def update_cams(host_timestamps):
     """
     if not host_timestamps:
         # No ScrubCam has connected yet.
-        return 'Waiting to connect to scrubcam...'
+        message = dbc.Alert(
+            'Waiting for a ScrubCam to connect...',
+            className='text-center p-4',
+            style={'font-size': '36px'},
+            color='danger'
+        )
+        return message
 
     # Create the grid.  The grid only consists of one row since each
     # dbc.Card has a responsive width to the screen size.  Using only
