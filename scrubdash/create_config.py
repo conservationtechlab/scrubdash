@@ -7,7 +7,7 @@ def main():
 
     with open(config_file) as config:
         lines = config.readlines()
-        example_config = open('config.yaml.example', 'a')
+        example_config = open('config.yaml.example', 'w')
         for line in lines:
             example_config.write(line)
         example_config.close()
