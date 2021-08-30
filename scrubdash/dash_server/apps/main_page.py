@@ -88,29 +88,27 @@ def update_cams(host_timestamps):
 
         row.append(
             dbc.Col(
-                html.Div(
-                    dbc.Card(
-                        dbc.CardBody(
-                            [
-                                # Link to a host's filter class grid page.
-                                html.A(
-                                    html.H3(hostname),
-                                    href='/{}'.format(hostname),
-                                    className='text-center light-green'
-                                ),
-                                # The connected/disconnected message.
-                                html.Div(
-                                    connection_msg,
-                                    className='text-center font-weight-bold',
-                                    style=text_color
-                                )
-                            ]
+                dbc.Card(
+                    [
+                        # Link to a host's filter class grid page.
+                        html.A(
+                            html.H3(hostname),
+                            href='/{}'.format(hostname),
+                            className='text-center light-green'
                         ),
-                        outline=True,
-                        color='success',
-                    ),
-                    className='pb-4 mt-1 mb-1'
+                        # The connected/disconnected message.
+                        html.Div(
+                            connection_msg,
+                            className='text-center font-weight-bold',
+                            style=text_color
+                        )
+                    ],
+                    className='h-100',
+                    style={'padding': '20px'},
+                    outline=True,
+                    color='success',
                 ),
+                className='pb-4 mt-1 mb-1',
                 # Reponsive column widths for each screen size.
                 xs=12, sm=6, md=6, lg=4, xl=4
             )
