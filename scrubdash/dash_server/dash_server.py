@@ -167,10 +167,10 @@ def start_dash(configs, asyncio_queue):
         elif re.match('/credits', pathname):
             return credits_page.layout
         # Matches with '/[hostname]/graph'
-        elif re.match('/[a-zA-Z0-9_]+/graphs', pathname):
+        elif re.match('/[a-zA-Z0-9-]+/graphs', pathname):
             return graphs_page.layout
         # Matches with '/[hostname]/[class]'
-        elif re.match('/[a-zA-Z0-9_]*/[a-zA-Z0-9_]+', pathname):
+        elif re.match('/[a-zA-Z0-9-]*/[a-zA-Z0-9_-]+', pathname):
             return history_page.layout
         # Matches with '/[hostname]'
         else:
