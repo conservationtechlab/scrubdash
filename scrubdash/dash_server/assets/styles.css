@@ -3,3 +3,100 @@ img {
   max-height: 100%;
   border: 1px solid black
 }
+
+/* Turn off existing buttons */
+.radio-group .custom-control-input ~ .custom-control-label::before {
+  content: none;
+}
+
+.radio-group .custom-radio .custom-control-input ~ .custom-control-label::after {
+  content: none;
+}
+
+/* restyle radio items */
+.radio-group .custom-control {
+  padding-left: 0;
+}
+
+.radio-group .btn-group > .custom-control:not(:last-child) > .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.radio-group .btn-group > .custom-control:not(:first-child) > .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+/* Header and text styles */
+.header {
+  color: #215732 !important;
+  display: inline-block !important;
+  border-bottom: 3px solid #62a138 !important;
+  padding-bottom: 5px !important;
+}
+
+.gray-text {
+  font-size: 20px;
+  font-weight: 500;
+  color: #787878 !important;
+  line-height:26px;
+  max-width: 900px;
+  text-align: center;
+  margin: 0 auto;
+}
+
+/* navbar styles */
+.nav-link-primary {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.nav-link-secondary {
+  color: #215732 !important;
+  font-size: 12px;
+  font-weight: 500; 
+}
+
+.nav-link:hover {
+  color: #29bd1a !important;
+}
+
+/* graphs page styles */
+.graph-header {
+  color: #62a138 !important;
+  padding-bottom: 5px !important;
+  margin-bottom: 20px;
+}
+
+.graph-divider {
+  border-top: 3px solid #62a138 !important;
+  padding-top: 30px;
+  margin-top: 10px;
+}
+
+/* history page styles */
+.history-sub-header {
+  color: #62a138 !important;
+  display: inline-block !important;
+  border-bottom: 3px solid #62a138 !important;
+}
+
+.big-btn {
+  width: 90px;
+  height: 40px;
+}
+
+/* colors */
+.light-green {
+  color: #62a138 !important;
+}
+
+.dark-green {
+  color: #215732 !important;
+}
+
+.light-gray {
+  color: #787878 !important;
+}

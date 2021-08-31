@@ -98,7 +98,7 @@ def check_connection(then):
         and a CSS style style dictionary to format the status
     """
     time_diff = _get_time_difference(then)
-    styles = {'color': 'red', 'whiteSpace': 'pre-wrap'}
+    styles = {'color': '#d9534f', 'whiteSpace': 'pre-wrap'}
 
     if time_diff['years'] > 0:
         msg = ('DISCONNECTED\nLast online: {} year(s), {} day(s) ago'
@@ -119,6 +119,6 @@ def check_connection(then):
                .format(time_diff['seconds']))
     else:
         msg = 'CONNECTED'
-        styles['color'] = 'green'
+        styles['color'] = '#5cb85c'
 
     return (msg, styles)
