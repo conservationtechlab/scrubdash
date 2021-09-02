@@ -1,1 +1,3 @@
 include scrubdash/cfgs/config.yaml.example
+include scrubdash/dash_server/assets/*
+include scrubdash/dash_server/assets/Roboto/*
