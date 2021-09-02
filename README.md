@@ -18,6 +18,8 @@ $ python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps scr
 ## Usage
 The core program in the project is `scrubdash.py` which spawns the two server processes. It accepts a YAML configuration file as a command line argument. There is an example config file in `./cfgs/config.yaml.example`.
 
+You can copy this example file and modify it to your specific purposes. See the **Config File** section to see what config settings you should change.
+
 **Note: If scrubdash was installed using PyPI, running the `create-config` console script in the terminal creates `config.yaml.example` in your current directory.**
 
 ```
@@ -33,7 +35,7 @@ Once ScrubDash is running, a ScrubCam can connect to it. If starting a new Scrub
 
 ## Config File
 The following values should be changed in the example config file:
-  1. `ASYNCIO_SERVER_IP`: this is the public IP of the device running the `asyncio` server. This is the IP address the asyncio server receives images on.
+  1. `ASYNCIO_SERVER_IP`: this is the private IP of the device running the `asyncio` server. This is the IP address the asyncio server receives images on. The range for private IP addresses is 10.x.x.x, 172.16.x.x-172.31.x.x, and 192.168.x.x, (x is a number from 0 to 255).
   2. `RECORD_FOLDER`: this is the absolute path specifying where to save the data for each ScrubCam session.
   3. `ALERT_CLASSES`: the list of classes ScrubDash should send an SMS and email notification for when observed in an image.
   4. `SENDER`: the email that `smtplib` uses to send the SMS and email notifications. NOTE: this email will not receive notifications unless also specified as a receiver in `EMAIL_RECEIVERS` or `SMS_RECEIVERS`.
@@ -100,7 +102,6 @@ ScrubDash creates a folder for each ScrubCam in `RECORD_FOLDER` and another fold
 │   └── ...
 .
 ```
-
 
 **Notes:**
   1. **A new ScrubCam session folder is created by running ScrubCam without the `-c` flag.**
