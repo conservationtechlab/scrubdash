@@ -101,7 +101,7 @@ layout = dbc.Container(
                         dbc.Col(
                             html.H5(
                                 'Class:',
-                                className='light-gray'
+                                className='dark-gray'
                             ),
                             # Reponsive column widths for each
                             # screen size.
@@ -125,7 +125,7 @@ layout = dbc.Container(
                         dbc.Col(
                             html.H5(
                                 'Time Span to Graph:',
-                                className='light-gray mb-2'
+                                className='dark-gray mb-2'
                             ),
                             width=12
                         ),
@@ -149,7 +149,7 @@ layout = dbc.Container(
                         dbc.Col(
                             html.H5(
                                 'Bucket Interval Size:',
-                                className='light-gray mb-2'
+                                className='dark-gray mb-2'
                             ),
                             width=12
                         ),

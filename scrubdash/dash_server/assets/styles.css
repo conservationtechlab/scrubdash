@@ -37,10 +37,17 @@ img {
   padding-bottom: 5px !important;
 }
 
+.sub-header {
+  color: #62a138 !important;
+  display: inline-block !important;
+  border-bottom: 3px solid #62a138 !important;
+  padding-bottom: 5px !important;  
+}
+
 .gray-text {
   font-size: 20px;
   font-weight: 500;
-  color: #787878 !important;
+  color: #48433d !important;
   line-height:26px;
   max-width: 900px;
   text-align: center;
@@ -97,6 +104,6 @@ img {
   color: #215732 !important;
 }
 
-.light-gray {
-  color: #787878 !important;
+.dark-gray {
+  color: #48433d !important;
 }

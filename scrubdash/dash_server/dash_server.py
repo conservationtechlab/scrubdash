@@ -11,7 +11,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
-from scrubdash.dash_server.apps import (credits_page, graphs_page,
+from scrubdash.dash_server.apps import (about_page, graphs_page,
                                         history_page, labels_page, main_page)
 from scrubdash.dash_server.images import create_image_dict
 
@@ -163,9 +163,9 @@ def start_dash(configs, asyncio_queue):
         """
         if pathname == '/':
             return main_page.layout
-        # Matches with '/credits'
-        elif re.match('/credits', pathname):
-            return credits_page.layout
+        # Matches with '/about'
+        elif re.match('/about', pathname):
+            return about_page.layout
         # Matches with '/[hostname]/graph'
         elif re.match('/[a-zA-Z0-9-]+/graphs', pathname):
             return graphs_page.layout

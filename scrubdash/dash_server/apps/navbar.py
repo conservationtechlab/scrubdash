@@ -34,8 +34,8 @@ logo_navbar = dbc.Navbar(
                     className='nav-link-secondary mr-4'
                 ),
                 html.A(
-                    'CREDITS',
-                    href='/credits',
+                    'ABOUT',
+                    href='/about',
                     className='nav-link-secondary'
                 )
             ],
