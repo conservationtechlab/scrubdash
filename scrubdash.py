@@ -15,7 +15,7 @@ from scrubdash.dash_server.dash_server import start_dash
 
 parser = argparse.ArgumentParser()
 parser.add_argument('config_filename')
-parser.add_argument('-c', '--cont', dest='cont', action='store_true')
+parser.add_argument('-c', '--continue', dest='cont', action='store_true')
 args = parser.parse_args()
 CONFIG_FILE = args.config_filename
 CONTINUE_RUN = args.cont

@@ -25,8 +25,8 @@ Usage:
     scrubdash [OPTIONS] <config_file>
     
 Options:
-    -h, --help      Output a usage message and exit
-    -c, --cont      Continue the most recent session
+    -h, --help          Output a usage message and exit
+    -c, --continue      Continue the most recent session
 ```
 
 Once ScrubDash is running, a ScrubCam can connect to it. If starting a new ScrubDash session (no `-c` flag), ScrubDash will render a "Waiting for a ScrubCam to connect..." message until a ScrubCam has successfully connected. If continuing a previous ScrubDash session, ScrubDash will automatically display ScrubCam device information from the previous session.
