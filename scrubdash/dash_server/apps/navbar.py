@@ -22,7 +22,7 @@ logo_navbar = dbc.Navbar(
                     )
                 ),
                 align='center',
-                no_gutters=True,
+                className="g-0",
             ),
             href='/',
         ),
