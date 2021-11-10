@@ -89,7 +89,7 @@ def update_cams(host_timestamps):
     host_timestamps = dict(sorted(host_timestamps.items(),
                                   key=lambda item: item[0]))
     for hostname, timestamp in host_timestamps.items():
-        heartbeat = datetime.utcfromtimestamp(timestamp)
+        heartbeat = datetime.fromtimestamp(timestamp)
         connection_msg, text_color = check_connection(heartbeat)
 
         row.append(
