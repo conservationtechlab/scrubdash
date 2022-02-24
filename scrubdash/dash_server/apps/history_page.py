@@ -167,7 +167,7 @@ layout = dbc.Container(
                                         confidence: str(confidence)+'%'
                                         for confidence in range(0, 101, 5)
                                     },
-                                    value=[0, 60],
+                                    value=[60, 100],
                                     tooltip={'always_visible': True},
                                 ),
                                 html.Div(
@@ -896,7 +896,7 @@ def reset_slider(modal_open, selected_confidence):
     """
     # The modal window is closed so reset the slider values.
     if not modal_open:
-        return [0, 60]
+        return [60, 100]
 
     # The modal window is open so return the current slider values.
     return selected_confidence
