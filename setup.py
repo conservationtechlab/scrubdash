@@ -35,8 +35,6 @@ setuptools.setup(
         'dash',
         'dash_daq',
         'dash_bootstrap_components ',
-        'dash_core_components ',
-        'dash_html_components',
         'numpy',
         'pandas',
         'Pillow',

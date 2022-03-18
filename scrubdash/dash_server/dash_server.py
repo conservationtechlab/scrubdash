@@ -6,8 +6,7 @@ asyncio server and handles which pages to show based on the url.
 import logging
 import re
 
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 from dash.dependencies import Input, Output
 
 from scrubdash.dash_server.app import app
