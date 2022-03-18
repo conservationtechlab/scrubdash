@@ -77,6 +77,8 @@ class AsyncioServer:
         self.port = configs['ASYNCIO_SERVER_PORT']
         self.RECORD_FOLDER = configs['RECORD_FOLDER']
 
+        self._ensure_record_folder()
+
     async def handle_session_config(self, reader, writer):
         """
         Create a new `HostSession` instance.
@@ -245,3 +247,9 @@ class AsyncioServer:
             # I think asyncio.run() gracefully cleans up all resources on
             # KeyboardInterrupt...not 100% sure though
             log.info('Successfully shut down asyncio server.')
+
+    def _ensure_record_folder(self):
+        folder_exists = os.path.exists(self.RECORD_FOLDER)
+
+        if not folder_exists:
+            os.mkdir(self.RECORD_FOLDER)
