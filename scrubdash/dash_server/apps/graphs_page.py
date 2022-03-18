@@ -4,10 +4,9 @@ import logging
 from datetime import datetime, timedelta
 
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
 import pandas as pd
 import plotly.express as px
+from dash import dcc, html
 from dash.dependencies import Input, Output, State
 
 from scrubdash.dash_server.app import app
