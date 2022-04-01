@@ -17,13 +17,13 @@ log = logging.getLogger(__name__)
 HOST = "smtp.gmail.com"
 # Exhaustive list of carriers: https://kb.sandisk.com/app/answers/detail/a_id/17056/~/list-of-mobile-carrier-gateway-addresses
 CARRIER_MAP = {
-    "verizon": "vtext.com",
+    "verizon": "vzwpix.com",
     "tmobile": "tmomail.net",
-    "sprint": "messaging.sprintpcs.com",
-    "at&t": "txt.att.net",
-    "boost": "smsmyboostmobile.com",
-    "cricket": "sms.cricketwireless.net",
-    "uscellular": "email.uscc.net",
+    "sprint": "pm.sprint.com",
+    "at&t": "mms.att.net",
+    "boost": "myboostmobile.com",
+    "cricket": "mms.mycricket.com",
+    "uscellular": "mms.uscc.net",
 }
 
 
