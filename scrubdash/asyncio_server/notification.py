@@ -22,7 +22,7 @@ CARRIER_MAP = {
     "sprint": "pm.sprint.com",
     "at&t": "mms.att.net",
     "boost": "myboostmobile.com",
-    "cricket": "mms.mycricket.com",
+    "cricket": "mms.cricketwireless.net",
     "uscellular": "mms.uscc.net",
 }
 
