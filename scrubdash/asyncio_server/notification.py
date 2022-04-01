@@ -77,7 +77,7 @@ class NotificationSender:
 
         return (date, time)
 
-    def compress_image(self, image_data):
+    def _compress_image(self, image_data):
         image = Image.open(io.BytesIO(image_data))
         output = io.BytesIO()
         image.save(output, format='JPEG', optimize=True, quality=75)
