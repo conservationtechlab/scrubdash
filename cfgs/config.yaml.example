@@ -20,7 +20,7 @@ EMAIL_RECEIVERS:
   - receiver1@gmail.com
   - receiver2@gmail.com
 
-# SMS NOTIFICATION CONFIGURATION
-SMS_RECEIVERS:
+# MMS NOTIFICATION CONFIGURATION
+MMS_RECEIVERS:
   - { num: 3332221111, carrier: tmobile }
   - { num: 8884442222, carrier: verizon }

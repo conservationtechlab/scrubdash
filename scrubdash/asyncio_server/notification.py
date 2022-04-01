@@ -1,5 +1,6 @@
-"""This file contains a class for sending email and SMS notifications."""
+"""This file contains a class for sending email and MMS notifications."""
 
+import io
 import logging
 import re
 import ssl
@@ -11,6 +12,7 @@ from email.mime.text import MIMEText
 from smtplib import SMTP_SSL, SMTPResponseException
 
 import aiosmtplib
+from PIL import Image
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ class NotificationSender:
         The password for the email used to send out notifications
     EMAIL_RECEIVERS : list of str
         The list of emails notifications will be sent to
-    SMS_RECEIVERS: list of dict of { 'num' : int, 'carrier' : str }
+    MMS_RECEIVERS: list of dict of { 'num' : int, 'carrier' : str }
         The list of dictionaries containing phone numbers and service
         carriers that notifications will be sent to
     """
@@ -48,7 +50,7 @@ class NotificationSender:
         self.SENDER = configs['SENDER']
         self.SENDER_PASSWORD = configs['SENDER_PASSWORD']
         self.EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
-        self.SMS_RECEIVERS = configs['SMS_RECEIVERS']
+        self.MMS_RECEIVERS = configs['MMS_RECEIVERS']
 
     def _get_datetime(self, image_path):
         """
@@ -75,9 +77,15 @@ class NotificationSender:
 
         return (date, time)
 
+    def compress_image(self, image_data):
+        image = Image.open(io.BytesIO(image_data))
+        output = io.BytesIO()
+        image.save(output, format='JPEG', optimize=True, quality=75)
+        return output.getvalue()
+
     async def send_mms(self, hostname, image_path, detected_alert_classes):
         """
-        Send an SMS notification to receivers listed in the `SMS_RECEIVERS`
+        Send a MMS notification to receivers listed in the `MMS_RECEIVERS`
         attribute.
         Parameters
         ----------
@@ -95,7 +103,7 @@ class NotificationSender:
         """
         date, time = self._get_datetime(image_path)
 
-        for receiver in self.SMS_RECEIVERS:
+        for receiver in self.MMS_RECEIVERS:
             num = receiver['num']
             carrier = receiver['carrier']
 
@@ -113,8 +121,9 @@ class NotificationSender:
 
             with open(image_path, 'rb') as content_file:
                 content = content_file.read()
+                image = self.compress_image(content)
                 message.add_attachment(
-                    content,
+                    image,
                     maintype='image',
                     subtype='jpeg',
                     filename='{}'.format(image_path.split('/')[-1])
