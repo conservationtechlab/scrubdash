@@ -75,7 +75,7 @@ class NotificationSender:
 
         return (date, time)
 
-    async def send_sms(self, hostname, image_path, detected_alert_classes):
+    async def send_mms(self, hostname, image_path, detected_alert_classes):
         """
         Send an SMS notification to receivers listed in the `SMS_RECEIVERS`
         attribute.
@@ -129,9 +129,9 @@ class NotificationSender:
                             start_tls=True
                         )
             res = await aiosmtplib.send(message, **send_kws)  # type: ignore
-            msg = ("failed to send sms to {}".format(num)
+            msg = ("Failed to send MMS to {}".format(num)
                    if not re.search(r"\sOK\s", res[1])
-                   else "succeeded to send sms to {}".format(num))
+                   else "Successfully sent MMS to {}".format(num))
             log.info(msg)
 
     def send_email(self, hostname, image_path, detected_alert_classes):
