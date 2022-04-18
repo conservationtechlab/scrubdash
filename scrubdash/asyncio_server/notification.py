@@ -121,7 +121,7 @@ class NotificationSender:
 
             with open(image_path, 'rb') as content_file:
                 content = content_file.read()
-                image = self.compress_image(content)
+                image = self._compress_image(content)
                 message.add_attachment(
                     image,
                     maintype='image',
