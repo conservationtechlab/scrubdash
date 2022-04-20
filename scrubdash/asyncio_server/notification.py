@@ -198,10 +198,11 @@ class NotificationSender:
             with SMTP_SSL(smtp_server, port, context=context) as server:
                 server.login(self.SENDER, self.SENDER_PASSWORD)
                 server.send_message(message)
-        except SMTPResponseException:
-            # Raise KeyboardInterrupt again so the asyncio server can catch
-            # it. Not raising the interrupt again causes only SMTP to stop,
-            # not the entire asyncio server. I suspect this is because SMTP
-            # will crash, but the asyncio server will be fine since the
-            # run_forever coroutine was never cancelled by an interrupt.
-            raise KeyboardInterrupt
+        except SMTPResponseException as e:
+            error_code = e.smtp_code
+            error_message = e.smtp_error.decode('utf-8')
+            log.info(
+                'Status: Unable to send email.'
+                f'\n\tCode: {error_code}'
+                f'\n\tMessage: {error_message}'
+            )
