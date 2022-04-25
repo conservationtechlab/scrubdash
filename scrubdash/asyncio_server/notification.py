@@ -1,7 +1,7 @@
-"""This file contains a class for sending email and SMS notifications."""
+"""This file contains a class for sending email and MMS notifications."""
 
+import io
 import logging
-import re
 import ssl
 from email import encoders
 from email.message import EmailMessage
@@ -11,19 +11,20 @@ from email.mime.text import MIMEText
 from smtplib import SMTP_SSL, SMTPResponseException
 
 import aiosmtplib
+from PIL import Image
 
 log = logging.getLogger(__name__)
 
 HOST = "smtp.gmail.com"
 # Exhaustive list of carriers: https://kb.sandisk.com/app/answers/detail/a_id/17056/~/list-of-mobile-carrier-gateway-addresses
 CARRIER_MAP = {
-    "verizon": "vtext.com",
+    "verizon": "vzwpix.com",
     "tmobile": "tmomail.net",
-    "sprint": "messaging.sprintpcs.com",
-    "at&t": "txt.att.net",
-    "boost": "smsmyboostmobile.com",
-    "cricket": "sms.cricketwireless.net",
-    "uscellular": "email.uscc.net",
+    "sprint": "pm.sprint.com",
+    "at&t": "mms.att.net",
+    "boost": "myboostmobile.com",
+    "cricket": "mms.cricketwireless.net",
+    "uscellular": "mms.uscc.net",
 }
 
 
@@ -39,16 +40,22 @@ class NotificationSender:
         The password for the email used to send out notifications
     EMAIL_RECEIVERS : list of str
         The list of emails notifications will be sent to
-    SMS_RECEIVERS: list of dict of { 'num' : int, 'carrier' : str }
+    MMS_RECEIVERS: list of dict of { 'num' : int, 'carrier' : str }
         The list of dictionaries containing phone numbers and service
         carriers that notifications will be sent to
     """
-    def __init__(self,
-                 configs):
+    def __init__(self, configs):
         self.SENDER = configs['SENDER']
         self.SENDER_PASSWORD = configs['SENDER_PASSWORD']
         self.EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
-        self.SMS_RECEIVERS = configs['SMS_RECEIVERS']
+        self.MMS_RECEIVERS = configs['MMS_RECEIVERS']
+        self.authentication_kwargs = dict(
+            username=self.SENDER,
+            password=self.SENDER_PASSWORD,
+            hostname=HOST,
+            port=587,
+            start_tls=True
+        )
 
     def _get_datetime(self, image_path):
         """
@@ -75,9 +82,47 @@ class NotificationSender:
 
         return (date, time)
 
-    async def send_sms(self, hostname, image_path, detected_alert_classes):
+    def _compress_image(self, image_data):
+        image = Image.open(io.BytesIO(image_data))
+        output = io.BytesIO()
+        image.save(output, format='JPEG', optimize=True, quality=75)
+        return output.getvalue()
+
+    def _create_text_message(self, **kwargs):
+        detected_alert_classes = kwargs.get('detected_art_classes')
+        hostname = kwargs.get('hostname')
+        image_path = kwargs.get('image_path')
+        phone_num = kwargs.get('phone_num')
+        to_email = kwargs.get('to_email')
+
+        date, time = self._get_datetime(image_path)
+
+        # Create message.
+        message = EmailMessage()
+        message['From'] = self.SENDER
+        message['To'] = f'{phone_num}@{to_email}'
+        message['Subject'] = f'New Scrubdash Image from {hostname}'
+        text = (
+            f'At {date} {time}, we received an image from {hostname} '
+            f'with the following detected classes: {detected_alert_classes}'
+        )
+        message.set_content(text)
+
+        with open(image_path, 'rb') as media_file:
+            media = media_file.read()
+            image = self._compress_image(media)
+            message.add_attachment(
+                image,
+                maintype='image',
+                subtype='jpeg',
+                filename='{}'.format(image_path.split('/')[-1])
+            )
+
+        return message
+
+    async def send_mms(self, hostname, image_path, detected_alert_classes):
         """
-        Send an SMS notification to receivers listed in the `SMS_RECEIVERS`
+        Send a MMS notification to receivers listed in the `MMS_RECEIVERS`
         attribute.
         Parameters
         ----------
@@ -93,46 +138,35 @@ class NotificationSender:
         This was adapted from a post from acamso on April 2, 2021 to a
         github code thread here: https://gist.github.com/alexle/1294495/39d13f2d4a004a4620c8630d1412738022a4058f
         """
-        date, time = self._get_datetime(image_path)
-
-        for receiver in self.SMS_RECEIVERS:
-            num = receiver['num']
+        for receiver in self.MMS_RECEIVERS:
+            phone_num = receiver['num']
             carrier = receiver['carrier']
-
             to_email = CARRIER_MAP[carrier]
 
-            # Create message.
-            message = EmailMessage()
-            message["From"] = self.SENDER
-            message["To"] = f"{num}@{to_email}"
-            message["Subject"] = 'New Scrubdash Image from {}'.format(hostname)
-            msg = ('At {} {}, we received an image from {} with the following'
-                   ' detected classes: {}'
-                   .format(date, time, hostname, detected_alert_classes))
-            message.set_content(msg)
+            message_kwargs = dict(
+                detected_alert_classes=detected_alert_classes,
+                hostname=hostname,
+                image_path=image_path,
+                phone_num=phone_num,
+                to_email=to_email
+            )
 
-            with open(image_path, 'rb') as content_file:
-                content = content_file.read()
-                message.add_attachment(
-                    content,
-                    maintype='image',
-                    subtype='jpeg',
-                    filename='{}'.format(image_path.split('/')[-1])
+            text_message = self._create_text_message(**message_kwargs)
+
+            try:
+                await aiosmtplib.send(
+                    text_message,
+                    **self.authentication_kwargs
                 )
-
-            # Send.
-            send_kws = dict(
-                            username=self.SENDER,
-                            password=self.SENDER_PASSWORD,
-                            hostname=HOST,
-                            port=587,
-                            start_tls=True
-                        )
-            res = await aiosmtplib.send(message, **send_kws)  # type: ignore
-            msg = ("failed to send sms to {}".format(num)
-                   if not re.search(r"\sOK\s", res[1])
-                   else "succeeded to send sms to {}".format(num))
-            log.info(msg)
+                log.debug(f'Successfully sent MMS to {phone_num}')
+            except aiosmtplib.errors.SMTPResponseException as e:
+                error_code = e.code
+                error_message = e.message
+                log.warning(
+                    f'Failed to send MMS to {phone_num}'
+                    f'\n\tCode: {error_code}'
+                    f'\n\tMessage: {error_message}'
+                )
 
     def send_email(self, hostname, image_path, detected_alert_classes):
         """
@@ -189,10 +223,12 @@ class NotificationSender:
             with SMTP_SSL(smtp_server, port, context=context) as server:
                 server.login(self.SENDER, self.SENDER_PASSWORD)
                 server.send_message(message)
-        except SMTPResponseException:
-            # Raise KeyboardInterrupt again so the asyncio server can catch
-            # it. Not raising the interrupt again causes only SMTP to stop,
-            # not the entire asyncio server. I suspect this is because SMTP
-            # will crash, but the asyncio server will be fine since the
-            # run_forever coroutine was never cancelled by an interrupt.
-            raise KeyboardInterrupt
+                log.debug('Successfully sent emails.')
+        except SMTPResponseException as e:
+            error_code = e.smtp_code
+            error_message = e.smtp_error.decode('utf-8')
+            log.warning(
+                'Failed to send emails.'
+                f'\n\tCode: {error_code}'
+                f'\n\tMessage: {error_message}'
+            )

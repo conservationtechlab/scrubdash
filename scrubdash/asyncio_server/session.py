@@ -261,7 +261,7 @@ class HostSession:
             self.notification_sender.send_email(self.HOSTNAME,
                                                 image_path,
                                                 detected_alert_classes)
-            await self.notification_sender.send_sms(self.HOSTNAME,
+            await self.notification_sender.send_mms(self.HOSTNAME,
                                                     image_path,
                                                     detected_alert_classes)
             last_alert_time = time.time()
