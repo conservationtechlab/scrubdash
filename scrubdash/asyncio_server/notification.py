@@ -2,7 +2,6 @@
 
 import io
 import logging
-import re
 import ssl
 from email import encoders
 from email.message import EmailMessage
@@ -45,12 +44,18 @@ class NotificationSender:
         The list of dictionaries containing phone numbers and service
         carriers that notifications will be sent to
     """
-    def __init__(self,
-                 configs):
+    def __init__(self, configs):
         self.SENDER = configs['SENDER']
         self.SENDER_PASSWORD = configs['SENDER_PASSWORD']
         self.EMAIL_RECEIVERS = configs['EMAIL_RECEIVERS']
         self.MMS_RECEIVERS = configs['MMS_RECEIVERS']
+        self.authentication_kwargs = dict(
+            username=self.SENDER,
+            password=self.SENDER_PASSWORD,
+            hostname=HOST,
+            port=587,
+            start_tls=True
+        )
 
     def _get_datetime(self, image_path):
         """
@@ -83,6 +88,38 @@ class NotificationSender:
         image.save(output, format='JPEG', optimize=True, quality=75)
         return output.getvalue()
 
+    def _create_text_message(self, **kwargs):
+        detected_alert_classes = kwargs.get('detected_art_classes')
+        hostname = kwargs.get('hostname')
+        image_path = kwargs.get('image_path')
+        phone_num = kwargs.get('phone_num')
+        to_email = kwargs.get('to_email')
+
+        date, time = self._get_datetime(image_path)
+
+        # Create message.
+        message = EmailMessage()
+        message['From'] = self.SENDER
+        message['To'] = f'{phone_num}@{to_email}'
+        message['Subject'] = f'New Scrubdash Image from {hostname}'
+        text = (
+            f'At {date} {time}, we received an image from {hostname} '
+            f'with the following detected classes: {detected_alert_classes}'
+        )
+        message.set_content(text)
+
+        with open(image_path, 'rb') as media_file:
+            media = media_file.read()
+            image = self._compress_image(media)
+            message.add_attachment(
+                image,
+                maintype='image',
+                subtype='jpeg',
+                filename='{}'.format(image_path.split('/')[-1])
+            )
+
+        return message
+
     async def send_mms(self, hostname, image_path, detected_alert_classes):
         """
         Send a MMS notification to receivers listed in the `MMS_RECEIVERS`
@@ -101,47 +138,35 @@ class NotificationSender:
         This was adapted from a post from acamso on April 2, 2021 to a
         github code thread here: https://gist.github.com/alexle/1294495/39d13f2d4a004a4620c8630d1412738022a4058f
         """
-        date, time = self._get_datetime(image_path)
-
         for receiver in self.MMS_RECEIVERS:
-            num = receiver['num']
+            phone_num = receiver['num']
             carrier = receiver['carrier']
-
             to_email = CARRIER_MAP[carrier]
 
-            # Create message.
-            message = EmailMessage()
-            message["From"] = self.SENDER
-            message["To"] = f"{num}@{to_email}"
-            message["Subject"] = 'New Scrubdash Image from {}'.format(hostname)
-            msg = ('At {} {}, we received an image from {} with the following'
-                   ' detected classes: {}'
-                   .format(date, time, hostname, detected_alert_classes))
-            message.set_content(msg)
+            message_kwargs = dict(
+                detected_alert_classes=detected_alert_classes,
+                hostname=hostname,
+                image_path=image_path,
+                phone_num=phone_num,
+                to_email=to_email
+            )
 
-            with open(image_path, 'rb') as content_file:
-                content = content_file.read()
-                image = self._compress_image(content)
-                message.add_attachment(
-                    image,
-                    maintype='image',
-                    subtype='jpeg',
-                    filename='{}'.format(image_path.split('/')[-1])
+            text_message = self._create_text_message(**message_kwargs)
+
+            try:
+                await aiosmtplib.send(
+                    text_message,
+                    **self.authentication_kwargs
                 )
-
-            # Send.
-            send_kws = dict(
-                            username=self.SENDER,
-                            password=self.SENDER_PASSWORD,
-                            hostname=HOST,
-                            port=587,
-                            start_tls=True
-                        )
-            res = await aiosmtplib.send(message, **send_kws)  # type: ignore
-            msg = ("Failed to send MMS to {}".format(num)
-                   if not re.search(r"\sOK\s", res[1])
-                   else "Successfully sent MMS to {}".format(num))
-            log.info(msg)
+                log.debug(f'Successfully sent MMS to {phone_num}')
+            except aiosmtplib.errors.SMTPResponseException as e:
+                error_code = e.code
+                error_message = e.message
+                log.warning(
+                    f'Failed to send MMS to {phone_num}'
+                    f'\n\tCode: {error_code}'
+                    f'\n\tMessage: {error_message}'
+                )
 
     def send_email(self, hostname, image_path, detected_alert_classes):
         """
@@ -198,11 +223,12 @@ class NotificationSender:
             with SMTP_SSL(smtp_server, port, context=context) as server:
                 server.login(self.SENDER, self.SENDER_PASSWORD)
                 server.send_message(message)
+                log.debug('Successfully sent emails.')
         except SMTPResponseException as e:
             error_code = e.smtp_code
             error_message = e.smtp_error.decode('utf-8')
-            log.info(
-                'Status: Unable to send email.'
+            log.warning(
+                'Failed to send emails.'
                 f'\n\tCode: {error_code}'
                 f'\n\tMessage: {error_message}'
             )
